@@ -1,6 +1,4 @@
-import type { ManifestItem } from '@pas7/llm-seo';
-
-export const contactItems: ManifestItem[] = [
+export const contactItems = [
   {
     slug: '/contact',
     locales: ['en', 'uk'],

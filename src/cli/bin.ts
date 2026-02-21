@@ -53,6 +53,7 @@ program
   .description('Validate generated llms.txt files against configuration')
   .option('-c, --config <path>', 'Path to config file')
   .option('--fail-on <level>', 'Fail on warnings (warn) or only errors (error)', 'error')
+  .option('--check-machine-hints-live', 'Check machine hint URLs (robots/sitemap/llms) over HTTP', false)
   .option('-v, --verbose', 'Show detailed output', false)
   .action(async (options) => {
     const { checkCommand } = await import('./commands/check.js');
@@ -67,6 +68,7 @@ program
     const exitCode = await checkCommand({
       config: options.config ?? program.opts().config,
       failOn,
+      checkMachineHintsLive: options.checkMachineHintsLive ?? false,
       verbose: options.verbose ?? program.opts().verbose ?? false,
     });
     process.exit(exitCode);

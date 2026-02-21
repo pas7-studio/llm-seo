@@ -1,6 +1,4 @@
-import type { ManifestItem } from '@pas7/llm-seo';
-
-export const blogItems: ManifestItem[] = [
+export const blogItems = [
   {
     slug: '/llm-seo-quickstart',
     locales: ['en', 'uk'],

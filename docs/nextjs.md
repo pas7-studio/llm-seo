@@ -29,6 +29,28 @@ Recommended setup:
 See hybrid example:
 - `examples/next-static-export-hybrid-routing`
 
+## Section Manifest Adapter
+
+Use `@pas7/llm-seo/adapters/next` to map Next content arrays into section manifests
+without custom transformation scripts.
+
+```ts
+import { createSectionManifest } from '@pas7/llm-seo/adapters/next';
+
+const blog = createSectionManifest({
+  items: BLOG_MANIFEST,
+  sectionPath: '/blog',
+  routeStyle: 'locale-segment',
+  defaultLocale: 'en',
+  slugKey: 'slug',
+  localesKey: 'locales',
+  updatedAtKey: 'updatedAt',
+  publishedAtKey: 'publishedAt',
+  titleFrom: 'title',
+  descriptionFrom: 'description',
+});
+```
+
 ## Installation
 
 ```bash

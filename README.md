@@ -110,6 +110,7 @@ llm-seo check [options]
 Options:
   -c, --config <path>   Path to config file
   --fail-on <level>     fail threshold: warn|error (default: error)
+  --check-machine-hints-live  Live-check machine hint URLs over HTTP
   -v, --verbose         Verbose logs
 ```
 
@@ -155,6 +156,7 @@ import {
 
 Use helpers from `@pas7/llm-seo/adapters/next` to normalize manifest items and build scripts.
 See [`examples/next-static-export`](./examples/next-static-export).
+For hybrid section routing, use `createSectionManifest(...)` and `applySectionCanonicalOverrides(...)`.
 Works with `@pas7/nextjs-sitemap-hreflang` in one build pipeline:
 
 ```bash

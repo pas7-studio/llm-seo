@@ -10,6 +10,14 @@ CI integration ensures your LLM SEO artifacts are:
 2. **Valid** - Checked for issues before deployment
 3. **Consistent** - Deterministic output matches expected
 
+Optional hardening in CI:
+
+```bash
+npx llm-seo check --fail-on error --check-machine-hints-live
+```
+
+This additionally validates that `robots.txt`, `sitemap.xml`, `llms.txt`, and `llms-full.txt` endpoints are reachable over HTTP.
+
 ## GitHub Actions
 
 ### Basic Setup

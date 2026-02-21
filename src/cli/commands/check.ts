@@ -3,6 +3,7 @@
  * Main implementation of `llm-seo check` CLI command.
  */
 
+import type { LlmsSeoConfig } from '../../schema/config.schema.js';
 import { loadConfig, type LoadConfigResult } from '../io/load-config.js';
 import {
   printError,
@@ -16,6 +17,7 @@ import {
   checkFilesAgainstExpected,
   type CheckOptions as CoreCheckOptions,
 } from '../../core/check/checker.js';
+import type { CheckIssue } from '../../core/check/issues.js';
 import { countSeverities } from '../../core/check/issues.js';
 import {
   createLlmsTxt,
@@ -31,6 +33,8 @@ export interface CheckCommandOptions {
   config: string;
   /** Fail threshold: treat warnings as errors */
   failOn: 'warn' | 'error';
+  /** Run live HTTP checks for machine hint URLs */
+  checkMachineHintsLive: boolean;
   /** Show detailed output */
   verbose: boolean;
 }
@@ -41,7 +45,7 @@ export interface CheckCommandOptions {
  * @returns Exit code
  */
 export async function checkCommand(options: CheckCommandOptions): Promise<number> {
-  const { config: configPath, failOn, verbose } = options;
+  const { config: configPath, failOn, checkMachineHintsLive, verbose } = options;
   
   try {
     // Step 1: Load config
@@ -136,6 +140,24 @@ export async function checkCommand(options: CheckCommandOptions): Promise<number
       }
     }
     
+    if (checkMachineHintsLive) {
+      const liveIssues = await checkMachineHintsLiveEndpoints(config, verbose);
+      if (liveIssues.length > 0) {
+        const issues = [...merged.issues, ...liveIssues];
+        const counts = countSeverities(issues);
+        merged = {
+          ...merged,
+          issues,
+          summary: {
+            ...merged.summary,
+            errors: counts.error,
+            warnings: counts.warning,
+            info: counts.info,
+          },
+        };
+      }
+    }
+
     // Step 3: Print report
     printCheckReport(merged, verbose);
     
@@ -155,4 +177,50 @@ export async function checkCommand(options: CheckCommandOptions): Promise<number
     printError(`Check failed: ${message}`);
     return ExitCodes.ERROR;
   }
+}
+
+async function checkMachineHintsLiveEndpoints(
+  config: LlmsSeoConfig,
+  verbose: boolean
+): Promise<CheckIssue[]> {
+  const baseUrl = config.site.baseUrl.replace(/\/+$/, '');
+  const urls = [
+    config.machineHints?.robots ?? `${baseUrl}/robots.txt`,
+    config.machineHints?.sitemap ?? `${baseUrl}/sitemap.xml`,
+    config.machineHints?.llmsTxt ?? `${baseUrl}/llms.txt`,
+    config.machineHints?.llmsFullTxt ?? `${baseUrl}/llms-full.txt`,
+  ];
+
+  const issues: CheckIssue[] = [];
+
+  for (const url of urls) {
+    try {
+      if (verbose) {
+        printVerbose(`Live-checking ${url}`);
+      }
+      const response = await fetch(url, {
+        method: 'GET',
+        signal: AbortSignal.timeout(10000),
+      });
+
+      if (!response.ok) {
+        issues.push({
+          path: url,
+          code: 'invalid_url',
+          message: `Live check failed with HTTP ${response.status}`,
+          severity: 'error',
+        });
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      issues.push({
+        path: url,
+        code: 'invalid_url',
+        message: `Live check request failed: ${message}`,
+        severity: 'error',
+      });
+    }
+  }
+
+  return issues;
 }

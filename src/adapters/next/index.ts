@@ -5,10 +5,15 @@
 // New manifest helpers
 export {
   fromNextContentManifest,
+  createSectionManifest,
+  applySectionCanonicalOverrides,
   createManifestFromPagesDir,
   createManifestFromData,
   type NextContentManifest,
   type FromNextContentManifestOptions,
+  type CreateSectionManifestOptions,
+  type ApplySectionCanonicalOverridesOptions,
+  type SectionFieldMapper,
   type CreateManifestFromPagesDirOptions,
   type CreateManifestFromDataOptions,
 } from './manifest.js';
