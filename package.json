@@ -1,6 +1,6 @@
 {
   "name": "@pas7/llm-seo",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Deterministic LLM SEO artifacts generation and validation for modern static sites",
   "type": "module",
   "bin": {
