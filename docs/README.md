@@ -9,6 +9,7 @@
 - [`policies.md`](./policies.md): geo policy, citations, restricted claims.
 - [`ci.md`](./ci.md): CI usage, exit codes, fail strategies.
 - [`nextjs.md`](./nextjs.md): Next.js and static export integration.
+- [`migration-matrix.md`](./migration-matrix.md): versioned migration matrix.
 
 ## Notes
 

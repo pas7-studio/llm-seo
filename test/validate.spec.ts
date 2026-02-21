@@ -451,6 +451,40 @@ describe('LlmsSeoConfigSchema', () => {
       expect(result.success).toBe(false);
       expect(result.issues?.some((e) => e.code === 'missing_custom_pathname')).toBe(true);
     });
+
+    it('should reject slug that already includes sectionPath', () => {
+      const data = {
+        ...createValidConfig(),
+        manifests: {
+          blog: {
+            sectionPath: '/blog',
+            routeStyle: 'prefix',
+            items: [{ slug: '/blog/post-1' }],
+          },
+        },
+      };
+
+      const result = validateLlmsSeoConfig(data);
+      expect(result.success).toBe(false);
+      expect(result.issues?.some((e) => e.code === 'incompatible_slug')).toBe(true);
+    });
+
+    it('should reject locale-prefixed slug for routeStyle prefix', () => {
+      const data = {
+        ...createValidConfig(),
+        manifests: {
+          blog: {
+            sectionPath: '/blog',
+            routeStyle: 'prefix',
+            items: [{ slug: '/uk/post-1' }],
+          },
+        },
+      };
+
+      const result = validateLlmsSeoConfig(data);
+      expect(result.success).toBe(false);
+      expect(result.issues?.some((e) => e.code === 'incompatible_slug')).toBe(true);
+    });
   });
 
   describe('contact validation', () => {

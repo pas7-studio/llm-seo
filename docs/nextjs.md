@@ -17,8 +17,8 @@ Next.js with static export is a perfect match for LLM SEO:
 ```bash
 llm-seo generate --config llm-seo.config.ts
 next build
-nextjs-sitemap-hreflang check --in out/sitemap.xml --fail-on-missing
-llm-seo check --config llm-seo.config.ts --fail-on error
+nextjs-sitemap-hreflang check --fail-on-missing --prefer out
+llm-seo check --config llm-seo.config.ts --check-live --emit-report .artifacts/llm-seo-report.json
 ```
 
 Recommended setup:
@@ -48,6 +48,28 @@ const blog = createSectionManifest({
   publishedAtKey: 'publishedAt',
   titleFrom: 'title',
   descriptionFrom: 'description',
+});
+```
+
+For generic arrays and route manifests:
+
+```ts
+import { fromManifestArray, fromRouteManifest } from '@pas7/llm-seo/adapters/next';
+
+const services = fromManifestArray(SERVICES, {
+  slugKey: 'path',
+  localesKey: 'langs',
+  updatedAtKey: 'updated',
+  titleFrom: 'heading',
+}, {
+  sectionPath: '/services',
+  routeStyle: 'prefix',
+});
+
+const blog = fromRouteManifest(ROUTES, {
+  sectionPath: '/blog',
+  routeStyle: 'locale-segment',
+  defaultLocale: 'en',
 });
 ```
 

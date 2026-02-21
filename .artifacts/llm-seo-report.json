@@ -1,0 +1,28 @@
+{
+  "status": "ok",
+  "summary": {
+    "errors": 0,
+    "warnings": 0,
+    "info": 0,
+    "filesChecked": 3,
+    "filesMissing": 0,
+    "filesMismatch": 0
+  },
+  "issues": [],
+  "files": {
+    "llmsTxt": "public/llms.txt",
+    "llmsFullTxt": "public/llms-full.txt",
+    "citations": "public/citations.json",
+    "report": ".artifacts/llm-seo-report.json"
+  },
+  "canonical": {
+    "total": 5,
+    "urls": [
+      "https://example.com/contact",
+      "https://example.com/services/ai-consulting",
+      "https://example.com/services/web-development",
+      "https://example.com/blog/en/ai-search-optimization",
+      "https://example.com/blog/en/getting-started-with-llm-seo"
+    ]
+  }
+}

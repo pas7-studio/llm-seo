@@ -2,6 +2,8 @@ import { describe, it, expect } from 'vitest';
 import {
   createSectionManifest,
   applySectionCanonicalOverrides,
+  fromManifestArray,
+  fromRouteManifest,
 } from '../src/adapters/next/manifest.js';
 
 describe('createSectionManifest', () => {
@@ -151,5 +153,53 @@ describe('applySectionCanonicalOverrides', () => {
     });
 
     expect(withOverrides.items[0]?.canonicalOverride).toBe('https://example.com/custom/uk/faq');
+  });
+});
+
+describe('fromManifestArray', () => {
+  it('maps array with field mapping into section config', () => {
+    const section = fromManifestArray(
+      [{ path: '/one', langs: ['en'], heading: 'One' }],
+      {
+        slugKey: 'path',
+        localesKey: 'langs',
+        titleFrom: 'heading',
+      },
+      {
+        sectionPath: '/blog',
+        routeStyle: 'prefix',
+      }
+    );
+
+    expect(section.sectionPath).toBe('/blog');
+    expect(section.routeStyle).toBe('prefix');
+    expect(section.items[0]?.slug).toBe('/one');
+    expect(section.items[0]?.title).toBe('One');
+  });
+});
+
+describe('fromRouteManifest', () => {
+  it('maps route-style inputs with params/locales/dates', () => {
+    const section = fromRouteManifest(
+      [
+        {
+          params: { slug: ['nested', 'post'] },
+          locale: 'uk',
+          publishedAt: '2026-02-01',
+          updatedAt: '2026-02-02',
+          title: 'Nested',
+        },
+      ],
+      {
+        routeStyle: 'locale-segment',
+        sectionPath: '/blog',
+      }
+    );
+
+    expect(section.items[0]?.slug).toBe('/nested/post');
+    expect(section.items[0]?.locales).toEqual(['uk']);
+    expect(section.items[0]?.publishedAt).toBe('2026-02-01');
+    expect(section.items[0]?.updatedAt).toBe('2026-02-02');
+    expect(section.items[0]?.title).toBe('Nested');
   });
 });

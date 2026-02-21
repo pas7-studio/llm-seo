@@ -84,7 +84,7 @@ export default {
 
 ```bash
 pnpm llm-seo generate --config llm-seo.config.ts
-pnpm llm-seo check --config llm-seo.config.ts --fail-on error
+pnpm llm-seo check --config llm-seo.config.ts --check-live --emit-report .artifacts/llm-seo-report.json --fail-on error
 pnpm llm-seo doctor --site https://example.com
 ```
 
@@ -110,7 +110,10 @@ llm-seo check [options]
 Options:
   -c, --config <path>   Path to config file
   --fail-on <level>     fail threshold: warn|error (default: error)
-  --check-machine-hints-live  Live-check machine hint URLs over HTTP
+  --check-live          Live-check machine hint URLs over HTTP
+  --timeout-ms <ms>     HTTP timeout per live check request
+  --retries <count>     Retry count for failed live checks
+  --emit-report <path>  Write JSON report
   -v, --verbose         Verbose logs
 ```
 
@@ -156,18 +159,41 @@ import {
 
 Use helpers from `@pas7/llm-seo/adapters/next` to normalize manifest items and build scripts.
 See [`examples/next-static-export`](./examples/next-static-export).
-For hybrid section routing, use `createSectionManifest(...)` and `applySectionCanonicalOverrides(...)`.
+For hybrid section routing, use:
+- `createSectionManifest(...)`
+- `fromManifestArray(...)`
+- `fromRouteManifest(...)`
+- `applySectionCanonicalOverrides(...)`
 Works with `@pas7/nextjs-sitemap-hreflang` in one build pipeline:
 
 ```bash
 llm-seo generate --config llm-seo.config.ts
 next build
-nextjs-sitemap-hreflang check --in out/sitemap.xml --fail-on-missing
-llm-seo check --config llm-seo.config.ts --fail-on error
+nextjs-sitemap-hreflang check --fail-on-missing --prefer out
+llm-seo check --config llm-seo.config.ts --check-live --emit-report .artifacts/llm-seo-report.json
 ```
 
 Hybrid routing example:
 - [`examples/next-static-export-hybrid-routing`](./examples/next-static-export-hybrid-routing)
+
+## Recommended Pipeline
+
+```bash
+llm-seo generate --config llm-seo.config.ts
+next build
+nextjs-sitemap-hreflang check --fail-on-missing --prefer out
+llm-seo check --config llm-seo.config.ts --check-live --emit-report .artifacts/llm-seo-report.json
+```
+
+## JSON Report Contract
+
+`--emit-report` outputs a stable JSON contract:
+
+- `status`: `ok | warn | error`
+- `issues`: normalized check issues
+- `summary`: counts and file stats
+- `files`: output file paths
+- `canonical`: canonical URL summary (`total`, `urls`)
 
 ## Contributing and Security
 

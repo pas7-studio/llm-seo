@@ -13,10 +13,57 @@ CI integration ensures your LLM SEO artifacts are:
 Optional hardening in CI:
 
 ```bash
-npx llm-seo check --fail-on error --check-machine-hints-live
+npx llm-seo check --fail-on error --check-live --timeout-ms 10000 --retries 1 --emit-report .artifacts/llm-seo-report.json
 ```
 
-This additionally validates that `robots.txt`, `sitemap.xml`, `llms.txt`, and `llms-full.txt` endpoints are reachable over HTTP.
+This additionally validates that `robots.txt`, `sitemap.xml`, `llms.txt`, and `llms-full.txt` endpoints are reachable over HTTP and emits a JSON report.
+
+## Recommended Pipeline
+
+```bash
+llm-seo generate --config llm-seo.config.ts
+next build
+nextjs-sitemap-hreflang check --fail-on-missing --prefer out
+llm-seo check --config llm-seo.config.ts --check-live --emit-report .artifacts/llm-seo-report.json
+```
+
+## Unified Report Contract
+
+`llm-seo check --emit-report` writes:
+
+- `status`
+- `issues`
+- `summary`
+- `files`
+
+## Monorepo Workflow (Both Packages)
+
+```yaml
+name: seo-pipeline
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  seo:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm -C apps/site llm-seo generate --config llm-seo.config.ts
+      - run: pnpm -C apps/site next build
+      - run: pnpm -C apps/site nextjs-sitemap-hreflang check --fail-on-missing --prefer out
+      - run: pnpm -C apps/site llm-seo check --config llm-seo.config.ts --check-live --emit-report .artifacts/llm-seo-report.json
+```
 
 ## GitHub Actions
 
@@ -187,12 +234,10 @@ The CLI uses specific exit codes for CI integration:
 
 | Code | Name | Description |
 |------|------|-------------|
-| 0 | SUCCESS | Operation completed successfully |
-| 1 | ERROR | General error occurred |
-| 2 | VALIDATION_ERROR | Config validation failed |
-| 3 | CHECK_FAILED | Check command found issues |
-| 4 | NOT_FOUND | File or resource not found |
-| 5 | COMMAND_NOT_FOUND | Unknown command |
+| 0 | OK | Operation completed successfully |
+| 1 | WARN | Warnings returned when `--fail-on warn` is enabled |
+| 2 | ERROR | Validation/check failures |
+| 3 | NETWORK_ERROR | Network/availability failure (doctor/live checks) |
 
 ### Using Exit Codes
 

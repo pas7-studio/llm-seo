@@ -53,7 +53,11 @@ program
   .description('Validate generated llms.txt files against configuration')
   .option('-c, --config <path>', 'Path to config file')
   .option('--fail-on <level>', 'Fail on warnings (warn) or only errors (error)', 'error')
-  .option('--check-machine-hints-live', 'Check machine hint URLs (robots/sitemap/llms) over HTTP', false)
+  .option('--check-live', 'Check machine hint URLs (robots/sitemap/llms) over HTTP', false)
+  .option('--check-machine-hints-live', 'Deprecated alias for --check-live', false)
+  .option('--timeout-ms <ms>', 'HTTP timeout for live checks in milliseconds', '10000')
+  .option('--retries <count>', 'Retry count for live checks', '0')
+  .option('--emit-report <path>', 'Write JSON report to path')
   .option('-v, --verbose', 'Show detailed output', false)
   .action(async (options) => {
     const { checkCommand } = await import('./commands/check.js');
@@ -68,7 +72,10 @@ program
     const exitCode = await checkCommand({
       config: options.config ?? program.opts().config,
       failOn,
-      checkMachineHintsLive: options.checkMachineHintsLive ?? false,
+      checkLive: Boolean(options.checkLive ?? options.checkMachineHintsLive ?? false),
+      timeoutMs: Number.parseInt(String(options.timeoutMs ?? '10000'), 10) || 10000,
+      retries: Number.parseInt(String(options.retries ?? '0'), 10) || 0,
+      emitReportPath: options.emitReport,
       verbose: options.verbose ?? program.opts().verbose ?? false,
     });
     process.exit(exitCode);

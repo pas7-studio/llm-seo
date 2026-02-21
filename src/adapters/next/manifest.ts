@@ -87,6 +87,63 @@ export interface CreateSectionManifestOptions<TItem extends Record<string, unkno
 }
 
 /**
+ * Field mapping for fromManifestArray.
+ */
+export interface ManifestArrayMapping<TItem extends Record<string, unknown>> {
+  slugKey?: keyof TItem;
+  localesKey?: keyof TItem;
+  updatedAtKey?: keyof TItem;
+  publishedAtKey?: keyof TItem;
+  priorityKey?: keyof TItem;
+  canonicalOverrideKey?: keyof TItem;
+  titleFrom?: SectionFieldMapper<TItem>;
+  descriptionFrom?: SectionFieldMapper<TItem>;
+}
+
+/**
+ * Section options for adapter helpers.
+ */
+export interface SectionOptions {
+  sectionName?: string;
+  sectionPath?: string;
+  routeStyle?: RouteStyle;
+  defaultLocale?: string;
+  defaultLocaleOverride?: string;
+  pathnameFor?: ManifestPathnameFor;
+}
+
+/**
+ * Input item for fromRouteManifest.
+ */
+export interface RouteManifestInputItem {
+  slug?: string;
+  route?: string;
+  locale?: string;
+  locales?: string[];
+  publishedAt?: string;
+  updatedAt?: string;
+  title?: string;
+  description?: string;
+  priority?: number;
+  params?: { slug?: string | string[] };
+  [key: string]: unknown;
+}
+
+/**
+ * Options for fromRouteManifest.
+ */
+export interface FromRouteManifestOptions extends SectionOptions {
+  slugKey?: string;
+  localesKey?: string;
+  localeKey?: string;
+  publishedAtKey?: string;
+  updatedAtKey?: string;
+  titleKey?: string;
+  descriptionKey?: string;
+  priorityKey?: string;
+}
+
+/**
  * Options for applySectionCanonicalOverrides helper.
  */
 export interface ApplySectionCanonicalOverridesOptions {
@@ -247,6 +304,76 @@ export function createSectionManifest<TItem extends Record<string, unknown>>(
 }
 
 /**
+ * Adapter helper for generic Next manifest arrays.
+ * Maps an arbitrary items array into section config for llm-seo manifests.
+ */
+export function fromManifestArray<TItem extends Record<string, unknown>>(
+  items: readonly TItem[],
+  mapping: ManifestArrayMapping<TItem> = {},
+  sectionOptions: SectionOptions = {}
+): ManifestSectionConfig {
+  return createSectionManifest({
+    items,
+    ...sectionOptions,
+    ...mapping,
+  });
+}
+
+/**
+ * Adapter helper for route-oriented manifests.
+ * Supports common route fields and getStaticPaths-style params.
+ */
+export function fromRouteManifest(
+  routes: readonly RouteManifestInputItem[],
+  options: FromRouteManifestOptions = {}
+): ManifestSectionConfig {
+  const {
+    slugKey = 'slug',
+    localesKey = 'locales',
+    localeKey = 'locale',
+    publishedAtKey = 'publishedAt',
+    updatedAtKey = 'updatedAt',
+    titleKey = 'title',
+    descriptionKey = 'description',
+    priorityKey = 'priority',
+    ...sectionOptions
+  } = options;
+
+  const normalized = routes.map((route) => {
+    const candidateSlug =
+      readStringByKey(route, slugKey) ??
+      readStringByKey(route, 'route') ??
+      slugFromParams(route.params);
+
+    const locales = readStringArrayByKey(route, localesKey);
+    const singleLocale = readStringByKey(route, localeKey);
+
+    return {
+      ...route,
+      __slug: candidateSlug,
+      __locales: locales.length > 0 ? locales : singleLocale ? [singleLocale] : undefined,
+      __publishedAt: readStringByKey(route, publishedAtKey),
+      __updatedAt: readStringByKey(route, updatedAtKey),
+      __title: readStringByKey(route, titleKey),
+      __description: readStringByKey(route, descriptionKey),
+      __priority: readNumberByKey(route, priorityKey),
+    };
+  });
+
+  return createSectionManifest({
+    items: normalized,
+    ...sectionOptions,
+    slugKey: '__slug',
+    localesKey: '__locales',
+    publishedAtKey: '__publishedAt',
+    updatedAtKey: '__updatedAt',
+    titleFrom: '__title',
+    descriptionFrom: '__description',
+    priorityKey: '__priority',
+  });
+}
+
+/**
  * Applies canonicalOverride values to each item in a section
  * based on the section routing strategy and base URL.
  */
@@ -324,6 +451,34 @@ function readMappedString<TItem extends Record<string, unknown>>(
     return typeof value === 'string' && value.length > 0 ? value : undefined;
   }
   return readStringField(item, mapper);
+}
+
+function readStringByKey(item: Record<string, unknown>, key: string): string | undefined {
+  const value = item[key];
+  return typeof value === 'string' && value.length > 0 ? value : undefined;
+}
+
+function readNumberByKey(item: Record<string, unknown>, key: string): number | undefined {
+  const value = item[key];
+  return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
+}
+
+function readStringArrayByKey(item: Record<string, unknown>, key: string): string[] {
+  const value = item[key];
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value.filter((entry): entry is string => typeof entry === 'string' && entry.length > 0);
+}
+
+function slugFromParams(params: { slug?: string | string[] } | undefined): string | undefined {
+  if (!params?.slug) {
+    return undefined;
+  }
+  if (Array.isArray(params.slug)) {
+    return `/${params.slug.join('/')}`;
+  }
+  return params.slug.startsWith('/') ? params.slug : `/${params.slug}`;
 }
 
 /**

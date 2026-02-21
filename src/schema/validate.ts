@@ -355,6 +355,69 @@ function validateManifestLocaleOverrides(config: LlmsSeoConfig): ValidationIssue
         severity: 'error',
       });
     }
+
+    const items = section.items;
+    const defaultLocale = section.defaultLocaleOverride ?? config.site.defaultLocale ?? config.brand.locales[0] ?? 'en';
+    const localeSet = new Set(config.brand.locales);
+
+    if (section.routeStyle === 'locale-segment' && !section.sectionPath) {
+      issues.push({
+        path: `manifests.${sectionName}.sectionPath`,
+        code: 'missing_section_path',
+        message: 'sectionPath is required when routeStyle is "locale-segment"',
+        severity: 'error',
+      });
+    }
+
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      if (!item?.slug) {
+        continue;
+      }
+      const slug = item.slug;
+      const segments = slug.split('/').filter(Boolean);
+      const first = segments[0];
+      const last = segments[segments.length - 1];
+      const hasSectionPrefix = section.sectionPath
+        ? slug === section.sectionPath || slug.startsWith(`${section.sectionPath}/`)
+        : false;
+
+      if (section.sectionPath && hasSectionPrefix) {
+        issues.push({
+          path: `manifests.${sectionName}.items.${i}.slug`,
+          code: 'incompatible_slug',
+          message: `Slug "${slug}" already includes sectionPath "${section.sectionPath}". Use section-relative slug like "/post".`,
+          severity: 'error',
+        });
+      }
+
+      if (section.routeStyle === 'prefix' && first && localeSet.has(first) && first !== defaultLocale) {
+        issues.push({
+          path: `manifests.${sectionName}.items.${i}.slug`,
+          code: 'incompatible_slug',
+          message: `Slug "${slug}" appears locale-prefixed for routeStyle "prefix". Provide section-relative slug without locale segment.`,
+          severity: 'error',
+        });
+      }
+
+      if (section.routeStyle === 'locale-segment' && first && localeSet.has(first)) {
+        issues.push({
+          path: `manifests.${sectionName}.items.${i}.slug`,
+          code: 'incompatible_slug',
+          message: `Slug "${slug}" includes locale segment but routeStyle "locale-segment" generates locale automatically.`,
+          severity: 'error',
+        });
+      }
+
+      if (section.routeStyle === 'suffix' && last && localeSet.has(last) && last !== defaultLocale) {
+        issues.push({
+          path: `manifests.${sectionName}.items.${i}.slug`,
+          code: 'incompatible_slug',
+          message: `Slug "${slug}" includes locale suffix but routeStyle "suffix" generates locale suffix automatically.`,
+          severity: 'error',
+        });
+      }
+    }
   }
 
   return issues;

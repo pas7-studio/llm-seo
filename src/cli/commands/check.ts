@@ -11,6 +11,7 @@ import {
   printVerbose,
   printCheckReport,
 } from '../io/report.js';
+import { writeJsonFileAtomic } from '../io/fs.js';
 import { ExitCodes } from '../exit-codes.js';
 import {
   checkGeneratedFiles,
@@ -34,9 +35,38 @@ export interface CheckCommandOptions {
   /** Fail threshold: treat warnings as errors */
   failOn: 'warn' | 'error';
   /** Run live HTTP checks for machine hint URLs */
-  checkMachineHintsLive: boolean;
+  checkLive: boolean;
+  /** Timeout in ms for each live request */
+  timeoutMs: number;
+  /** Number of retries for failed live requests */
+  retries: number;
+  /** Optional JSON report output path */
+  emitReportPath?: string;
   /** Show detailed output */
   verbose: boolean;
+}
+
+export interface CheckJsonReport {
+  status: 'ok' | 'warn' | 'error';
+  summary: {
+    errors: number;
+    warnings: number;
+    info: number;
+    filesChecked: number;
+    filesMissing: number;
+    filesMismatch: number;
+  };
+  issues: CheckIssue[];
+  files: {
+    llmsTxt: string;
+    llmsFullTxt: string;
+    citations?: string;
+    report?: string;
+  };
+  canonical: {
+    total: number;
+    urls: string[];
+  };
 }
 
 /**
@@ -45,7 +75,7 @@ export interface CheckCommandOptions {
  * @returns Exit code
  */
 export async function checkCommand(options: CheckCommandOptions): Promise<number> {
-  const { config: configPath, failOn, checkMachineHintsLive, verbose } = options;
+  const { config: configPath, failOn, checkLive, timeoutMs, retries, emitReportPath, verbose } = options;
   
   try {
     // Step 1: Load config
@@ -140,8 +170,12 @@ export async function checkCommand(options: CheckCommandOptions): Promise<number
       }
     }
     
-    if (checkMachineHintsLive) {
-      const liveIssues = await checkMachineHintsLiveEndpoints(config, verbose);
+    if (checkLive) {
+      const liveIssues = await checkMachineHintsLiveEndpoints(config, {
+        timeoutMs,
+        retries,
+        verbose,
+      });
       if (liveIssues.length > 0) {
         const issues = [...merged.issues, ...liveIssues];
         const counts = countSeverities(issues);
@@ -160,6 +194,19 @@ export async function checkCommand(options: CheckCommandOptions): Promise<number
 
     // Step 3: Print report
     printCheckReport(merged, verbose);
+
+    if (emitReportPath) {
+      const report = buildJsonReport({
+        merged,
+        config,
+        canonicalUrls: canonicalBundle.canonicalUrls,
+        emitReportPath,
+      });
+      await writeJsonFileAtomic(emitReportPath, report);
+      if (verbose) {
+        printVerbose(`Wrote check report: ${emitReportPath}`);
+      }
+    }
     
     // Step 4: Return exit code
     if (merged.summary.errors > 0) {
@@ -181,8 +228,13 @@ export async function checkCommand(options: CheckCommandOptions): Promise<number
 
 async function checkMachineHintsLiveEndpoints(
   config: LlmsSeoConfig,
-  verbose: boolean
+  options: {
+    timeoutMs: number;
+    retries: number;
+    verbose: boolean;
+  }
 ): Promise<CheckIssue[]> {
+  const { timeoutMs, retries, verbose } = options;
   const baseUrl = config.site.baseUrl.replace(/\/+$/, '');
   const urls = [
     config.machineHints?.robots ?? `${baseUrl}/robots.txt`,
@@ -194,33 +246,68 @@ async function checkMachineHintsLiveEndpoints(
   const issues: CheckIssue[] = [];
 
   for (const url of urls) {
-    try {
-      if (verbose) {
-        printVerbose(`Live-checking ${url}`);
-      }
-      const response = await fetch(url, {
-        method: 'GET',
-        signal: AbortSignal.timeout(10000),
-      });
-
-      if (!response.ok) {
-        issues.push({
-          path: url,
-          code: 'invalid_url',
-          message: `Live check failed with HTTP ${response.status}`,
-          severity: 'error',
+    let lastError: string | null = null;
+    for (let attempt = 0; attempt <= retries; attempt++) {
+      try {
+        if (verbose) {
+          printVerbose(`Live-checking ${url} (attempt ${attempt + 1}/${retries + 1})`);
+        }
+        const response = await fetch(url, {
+          method: 'GET',
+          signal: AbortSignal.timeout(timeoutMs),
         });
+
+        if (!response.ok) {
+          lastError = `HTTP ${response.status}`;
+          continue;
+        }
+
+        lastError = null;
+        break;
+      } catch (error) {
+        lastError = error instanceof Error ? error.message : String(error);
       }
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
+    }
+
+    if (lastError) {
       issues.push({
         path: url,
         code: 'invalid_url',
-        message: `Live check request failed: ${message}`,
+        message: `Live check failed after ${retries + 1} attempt(s): ${lastError}`,
         severity: 'error',
       });
     }
   }
 
   return issues;
+}
+
+function buildJsonReport(options: {
+  merged: Awaited<ReturnType<typeof checkGeneratedFiles>>;
+  config: LlmsSeoConfig;
+  canonicalUrls: string[];
+  emitReportPath: string;
+}): CheckJsonReport {
+  const { merged, config, canonicalUrls, emitReportPath } = options;
+  const status: CheckJsonReport['status'] = merged.summary.errors > 0
+    ? 'error'
+    : merged.summary.warnings > 0
+      ? 'warn'
+      : 'ok';
+
+  return {
+    status,
+    summary: merged.summary,
+    issues: merged.issues,
+    files: {
+      llmsTxt: config.output.paths.llmsTxt,
+      llmsFullTxt: config.output.paths.llmsFullTxt,
+      ...(config.output.paths.citations && { citations: config.output.paths.citations }),
+      report: emitReportPath,
+    },
+    canonical: {
+      total: canonicalUrls.length,
+      urls: canonicalUrls,
+    },
+  };
 }
