@@ -1,6 +1,6 @@
 {
   "name": "next-static-export-example",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Example Next.js static export project with @pas7/llm-seo integration",
   "type": "module",
   "private": true,
