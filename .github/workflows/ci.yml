@@ -1,0 +1,75 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  ci:
+    name: CI
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        node-version: [18, 20]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 8
+
+      - name: Setup Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Type check
+        run: pnpm typecheck
+
+      - name: Run tests
+        run: pnpm test
+
+      - name: Build
+        run: pnpm build
+
+      - name: Verify CLI works
+        run: |
+          node dist/cli/bin.js --help
+          node dist/cli/bin.js --version
+
+      - name: Verify library exports
+        run: |
+          node -e "const lib = require('./dist/index.js'); console.log('Exports:', Object.keys(lib).slice(0, 10).join(', '))" || \
+          node --input-type=module -e "import * as lib from './dist/index.js'; console.log('Exports:', Object.keys(lib).slice(0, 10).join(', '))"
+
+  # Optional: LLM SEO check job
+  # Uncomment if you have a llm-seo.config.ts in the repo
+  # llm-seo:
+  #   name: LLM SEO Check
+  #   runs-on: ubuntu-latest
+  #   needs: ci
+  #   if: github.event_name == 'pull_request'
+  #
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #     - uses: pnpm/action-setup@v2
+  #       with:
+  #         version: 8
+  #     - uses: actions/setup-node@v4
+  #       with:
+  #         node-version: 20
+  #         cache: 'pnpm'
+  #     - run: pnpm install --frozen-lockfile
+  #     - run: pnpm build
+  #     - name: Check LLM SEO
+  #       run: npx llm-seo check --fail-on error

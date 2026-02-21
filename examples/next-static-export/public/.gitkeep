@@ -1,0 +1,5 @@
+# This file ensures the public directory is tracked by git.
+# Generated files will be placed here:
+# - llms.txt
+# - llms-full.txt
+# - citations.json

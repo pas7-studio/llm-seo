@@ -1,0 +1,79 @@
+{
+  "name": "@pas7/llm-seo",
+  "version": "0.1.0",
+  "description": "Deterministic LLM SEO artifacts generation and validation for modern static sites",
+  "type": "module",
+  "bin": {
+    "llm-seo": "./dist/cli/bin.js"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./core": {
+      "types": "./dist/core/index.d.ts",
+      "import": "./dist/core/index.js"
+    },
+    "./schema": {
+      "types": "./dist/schema/index.d.ts",
+      "import": "./dist/schema/index.js"
+    },
+    "./adapters": {
+      "types": "./dist/adapters/index.d.ts",
+      "import": "./dist/adapters/index.js"
+    },
+    "./adapters/next": {
+      "types": "./dist/adapters/next/index.d.ts",
+      "import": "./dist/adapters/next/index.js"
+    }
+  },
+  "types": "./dist/index.d.ts",
+  "main": "./dist/index.js",
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "eslint src --ext .ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "commander": "^12.1.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.10",
+    "tsup": "^8.1.0",
+    "typescript": "^5.5.3",
+    "vitest": "^1.6.0"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [
+    "llm",
+    "seo",
+    "llms.txt",
+    "static-site",
+    "ssg",
+    "next.js",
+    "ai",
+    "crawlers",
+    "optimization"
+  ],
+  "author": "",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/pas7/llm-seo.git"
+  },
+  "bugs": {
+    "url": "https://github.com/pas7/llm-seo/issues"
+  },
+  "homepage": "https://github.com/pas7/llm-seo#readme"
+}
