@@ -59,6 +59,8 @@ importers:
         specifier: ^5.3.0
         version: 5.9.3
 
+  examples/next-static-export-hybrid-routing: {}
+
 packages:
 
   '@babel/runtime@7.28.6':
