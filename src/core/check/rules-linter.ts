@@ -159,6 +159,16 @@ export function checkForbiddenTerms(
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
     if (line === undefined) continue;
+    const trimmed = line.trim();
+    const loweredTrimmed = trimmed.toLowerCase();
+
+    // Do not lint policy definition lines that explicitly list forbidden/allowed terms.
+    if (
+      loweredTrimmed.startsWith('forbidden terms:') ||
+      loweredTrimmed.startsWith('exceptions:')
+    ) {
+      continue;
+    }
     
     for (const term of forbidden) {
       const termLower = term.toLowerCase();
@@ -178,7 +188,7 @@ export function checkForbiddenTerms(
             message: `Term "${term}" is forbidden by policy`,
             severity: 'warning',
             line: i + 1,
-            context: line.trim().substring(0, 100),
+            context: trimmed.substring(0, 100),
           });
         }
       }
@@ -203,6 +213,7 @@ export function checkEmptySections(content: string): CheckIssue[] {
   
   let currentSection: string | null = null;
   let sectionStartLine = 0;
+  let sectionHeadingLevel = 0;
   let sectionHasContent = false;
   let sectionWasFirst = false;
   let isFirstHeading = true;
@@ -215,6 +226,13 @@ export function checkEmptySections(content: string): CheckIssue[] {
     const headingMatch = line.match(/^(#{1,6})\s+(.+)$/);
     
     if (headingMatch?.[2]) {
+      const nextHeadingLevel = headingMatch[1]?.length ?? 0;
+
+      // A subsection counts as content for its parent section.
+      if (currentSection !== null && nextHeadingLevel > sectionHeadingLevel) {
+        sectionHasContent = true;
+      }
+
       // Check if previous section was empty (had heading but no content)
       // Skip check for the first heading (document title)
       if (currentSection !== null && !sectionHasContent && !sectionWasFirst) {
@@ -230,6 +248,7 @@ export function checkEmptySections(content: string): CheckIssue[] {
       // Start new section
       currentSection = headingMatch[2].trim();
       sectionStartLine = i + 1;
+      sectionHeadingLevel = nextHeadingLevel;
       sectionHasContent = false;
       sectionWasFirst = isFirstHeading;
       isFirstHeading = false;

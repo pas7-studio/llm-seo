@@ -4,11 +4,11 @@
  */
 
 import { existsSync } from 'node:fs';
-import { resolve, extname, basename } from 'node:path';
+import { resolve, extname } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import type { LlmsSeoConfig } from '../../schema/config.schema.js';
 import { LlmsSeoConfigSchema } from '../../schema/config.schema.js';
-import { fileExists, readFileSafe } from './fs.js';
+import { readFileSafe } from './fs.js';
 
 /**
  * Validation issue from config parsing.
@@ -150,7 +150,7 @@ export async function loadConfig(options: LoadConfigOptions): Promise<LoadConfig
     }
     try {
       rawConfig = JSON.parse(content);
-    } catch (error) {
+    } catch {
       throw new Error(`Failed to parse JSON config: ${absolutePath}`);
     }
   } else {

@@ -4,16 +4,10 @@
  */
 
 import type { LlmsSeoConfig } from '../../schema/config.schema.js';
-import { loadConfig, findConfigFile, type LoadConfigResult } from '../io/load-config.js';
-import { fileExists } from '../io/fs.js';
+import { loadConfig, findConfigFile } from '../io/load-config.js';
 import {
-  printSuccess,
-  printError,
-  printWarning,
-  printInfo,
   printVerbose,
   printDoctorReport,
-  printHeader,
   type DoctorCheck,
 } from '../io/report.js';
 import { ExitCodes } from '../exit-codes.js';
@@ -310,11 +304,4 @@ async function checkEndpoint(
       responseTime,
     };
   }
-}
-
-/**
- * Checks if a package.json exists in current directory.
- */
-async function checkPackageJson(): Promise<boolean> {
-  return fileExists('package.json');
 }

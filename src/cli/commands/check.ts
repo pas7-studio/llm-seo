@@ -5,26 +5,25 @@
 
 import type { LlmsSeoConfig } from '../../schema/config.schema.js';
 import { loadConfig, type LoadConfigResult } from '../io/load-config.js';
-import { readFileSafe, getFileStats } from '../io/fs.js';
 import {
-  printSuccess,
   printError,
   printWarning,
-  printInfo,
   printVerbose,
   printCheckReport,
 } from '../io/report.js';
 import { ExitCodes } from '../exit-codes.js';
 import {
   checkGeneratedFiles,
-  type CheckResult,
-  type CheckOptions,
+  checkFilesAgainstExpected,
+  type CheckOptions as CoreCheckOptions,
 } from '../../core/check/checker.js';
+import { countSeverities } from '../../core/check/issues.js';
 import {
   createLlmsTxt,
   createLlmsFullTxt,
-  extractCanonicalUrls,
+  createCanonicalUrlsFromManifest,
 } from '../../core/index.js';
+import type { ManifestItem } from '../../schema/manifest.schema.js';
 
 /**
  * Options for the check command.
@@ -83,25 +82,75 @@ export async function checkCommand(options: CheckCommandOptions): Promise<number
       printVerbose('Running SEO checks...');
     }
     
-    const checkOptions: CheckOptions = {
+    const checkOptions: CoreCheckOptions = {
       config,
       failOn,
       llmsTxtPath: config.output.paths.llmsTxt,
       llmsFullTxtPath: config.output.paths.llmsFullTxt,
-      citationsPath: config.output.paths.citations,
+      ...(config.output.paths.citations && { citationsPath: config.output.paths.citations }),
     };
     
     const result = await checkGeneratedFiles(checkOptions);
+
+    const manifestItems = extractManifestItems(config);
+    const canonicalUrls = createCanonicalUrlsFromManifest({
+      items: manifestItems,
+      baseUrl: config.site.baseUrl,
+      defaultLocale: config.site.defaultLocale ?? config.brand.locales[0] ?? 'en',
+      trailingSlash: config.format?.trailingSlash ?? 'never',
+      localeStrategy: 'prefix',
+    });
+    const expectedLlms = createLlmsTxt({ config, canonicalUrls });
+    const expectedLlmsFull = createLlmsFullTxt({
+      config,
+      canonicalUrls,
+      manifestItems,
+    });
+
+    const requiredMissing = result.issues.some((issue) => {
+      return (
+        issue.code === 'file_missing' &&
+        (issue.path === config.output.paths.llmsTxt ||
+          issue.path === config.output.paths.llmsFullTxt)
+      );
+    });
+
+    let merged = result;
+    if (!requiredMissing) {
+      const mismatchIssues = await checkFilesAgainstExpected(
+        config.output.paths.llmsTxt,
+        expectedLlms.content,
+        config.output.paths.llmsFullTxt,
+        expectedLlmsFull.content
+      );
+
+      if (mismatchIssues.length > 0) {
+        const issues = [...result.issues, ...mismatchIssues];
+        const counts = countSeverities(issues);
+        const mismatchCount = mismatchIssues.filter((issue) => issue.code === 'file_mismatch').length;
+        merged = {
+          ...result,
+          issues,
+          summary: {
+            ...result.summary,
+            errors: counts.error,
+            warnings: counts.warning,
+            info: counts.info,
+            filesMismatch: result.summary.filesMismatch + mismatchCount,
+          },
+        };
+      }
+    }
     
     // Step 3: Print report
-    printCheckReport(result, verbose);
+    printCheckReport(merged, verbose);
     
     // Step 4: Return exit code
-    if (result.summary.errors > 0) {
+    if (merged.summary.errors > 0) {
       return ExitCodes.ERROR;
     }
     
-    if (failOn === 'warn' && result.summary.warnings > 0) {
+    if (failOn === 'warn' && merged.summary.warnings > 0) {
       return ExitCodes.WARN;
     }
     
@@ -117,20 +166,8 @@ export async function checkCommand(options: CheckCommandOptions): Promise<number
 /**
  * Extracts manifest items from config.
  */
-function extractManifestItems(config: LlmsSeoConfig): Array<{
-  slug: string;
-  title?: string;
-  description?: string;
-  locales?: string[];
-  canonicalOverride?: string;
-}> {
-  const items: Array<{
-    slug: string;
-    title?: string;
-    description?: string;
-    locales?: string[];
-    canonicalOverride?: string;
-  }> = [];
+function extractManifestItems(config: LlmsSeoConfig): ManifestItem[] {
+  const items: ManifestItem[] = [];
   
   const manifests = config.manifests;
   
@@ -140,30 +177,18 @@ function extractManifestItems(config: LlmsSeoConfig): Array<{
       
       if (Array.isArray(data.pages)) {
         for (const page of data.pages) {
-          if (typeof page === 'object' && page !== null) {
-            const pageData = page as Record<string, unknown>;
-            items.push({
-              slug: String(pageData.slug ?? pageData.path ?? ''),
-              title: pageData.title as string | undefined,
-              description: pageData.description as string | undefined,
-              locales: pageData.locales as string[] | undefined,
-              canonicalOverride: pageData.canonicalOverride as string | undefined,
-            });
+          const normalized = toManifestItem(page);
+          if (normalized) {
+            items.push(normalized);
           }
         }
       }
       
       if (Array.isArray(data)) {
         for (const item of data) {
-          if (typeof item === 'object' && item !== null) {
-            const itemData = item as Record<string, unknown>;
-            items.push({
-              slug: String(itemData.slug ?? itemData.path ?? ''),
-              title: itemData.title as string | undefined,
-              description: itemData.description as string | undefined,
-              locales: itemData.locales as string[] | undefined,
-              canonicalOverride: itemData.canonicalOverride as string | undefined,
-            });
+          const normalized = toManifestItem(item);
+          if (normalized) {
+            items.push(normalized);
           }
         }
       }
@@ -173,30 +198,45 @@ function extractManifestItems(config: LlmsSeoConfig): Array<{
   return items;
 }
 
-/**
- * Builds canonical URLs from config and manifest items.
- */
-function buildCanonicalUrls(
-  config: LlmsSeoConfig,
-  manifestItems: Array<{ slug: string; canonicalOverride?: string }>
-): string[] {
-  const urls: string[] = [];
-  const baseUrl = config.site.baseUrl;
-  
-  for (const item of manifestItems) {
-    if (item.canonicalOverride) {
-      urls.push(item.canonicalOverride);
-    } else if (item.slug) {
-      const slug = item.slug.startsWith('/') ? item.slug : `/${item.slug}`;
-      urls.push(`${baseUrl}${slug}`);
+function toManifestItem(value: unknown): ManifestItem | null {
+  if (typeof value !== 'object' || value === null) {
+    return null;
+  }
+
+  const data = value as Record<string, unknown>;
+  const rawSlug = data.slug ?? data.path;
+  if (typeof rawSlug !== 'string' || rawSlug.length === 0) {
+    return null;
+  }
+
+  const item: ManifestItem = {
+    slug: rawSlug.startsWith('/') ? rawSlug : `/${rawSlug}`,
+  };
+
+  if (typeof data.title === 'string') {
+    item.title = data.title;
+  }
+  if (typeof data.description === 'string') {
+    item.description = data.description;
+  }
+  if (Array.isArray(data.locales)) {
+    const locales = data.locales.filter((loc): loc is string => typeof loc === 'string');
+    if (locales.length > 0) {
+      item.locales = locales;
     }
   }
-  
-  return urls;
-}
+  if (typeof data.canonicalOverride === 'string') {
+    item.canonicalOverride = data.canonicalOverride;
+  }
+  if (typeof data.publishedAt === 'string') {
+    item.publishedAt = data.publishedAt;
+  }
+  if (typeof data.updatedAt === 'string') {
+    item.updatedAt = data.updatedAt;
+  }
+  if (typeof data.priority === 'number') {
+    item.priority = data.priority;
+  }
 
-// Legacy export for backwards compatibility
-export interface CheckOptions {
-  config: string;
-  strict: boolean;
+  return item;
 }

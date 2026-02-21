@@ -12,6 +12,12 @@ export { normalizeWhitespace, normalizeLineEndings, normalizeLineWhitespace, nor
 export {
   generateCanonicalUrl,
   extractCanonicalUrls,
+  createCanonicalUrlsFromManifest,
+  createCanonicalUrlForItem,
+  dedupeUrls,
+  type CreateCanonicalUrlsOptions,
+  type LocaleStrategy,
+  type TrailingSlashPolicy,
   type CanonicalOptions,
 } from './canonical/canonical-from-manifest.js';
 export {
@@ -59,9 +65,17 @@ export {
 // Check utilities
 export {
   checkManifest,
+  checkGeneratedFiles,
+  checkFilesAgainstExpected,
+  compareContent,
+  readFileContent,
+  checkFileExists,
   DEFAULT_CHECKER_CONFIG,
   type CheckerConfig,
   type CheckerResult,
+  type CheckOptions,
+  type CheckResult,
+  type CompareResult,
 } from './check/checker.js';
 export {
   createIssue,

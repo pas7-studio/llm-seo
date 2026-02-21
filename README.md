@@ -1,205 +1,164 @@
 # @pas7/llm-seo
 
-[![npm version](https://badge.fury.io/js/@pas7/llm-seo.svg)](https://badge.fury.io/js/@pas7/llm-seo)
-[![CI](https://github.com/pas7studio/llm-seo/actions/workflows/ci.yml/badge.svg)](https://github.com/pas7studio/llm-seo/actions/workflows/ci.yml)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![CI](https://github.com/pas7-studio/llm-seo/actions/workflows/ci.yml/badge.svg)](https://github.com/pas7-studio/llm-seo/actions/workflows/ci.yml)
+[![npm version](https://img.shields.io/npm/v/%40pas7%2Fllm-seo.svg)](https://www.npmjs.com/package/@pas7/llm-seo)
+[![npm downloads](https://img.shields.io/npm/dm/%40pas7%2Fllm-seo.svg)](https://www.npmjs.com/package/@pas7/llm-seo)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
 
-**Deterministic LLM SEO artifacts generator & validator for modern static sites (Next.js/SSG-ready).**
+Deterministic LLM SEO artifacts generator & validator for modern static sites (Next.js/SSG-ready).
 
-## Why LLM/GEO SEO Artifacts?
+## Value Proposition
 
-LLMs like ChatGPT, Claude, and Gemini are becoming major sources of traffic. 
-Providing structured `llms.txt` and `llms-full.txt` files helps these models 
-understand and cite your content correctly.
+One config in, deterministic artifacts out:
+- generate `llms.txt` and `llms-full.txt`
+- build canonical URLs from manifest items
+- lint policy constraints (restricted claims, duplicates, empty sections)
+- check generated files in CI with explicit exit codes
 
-## Features
+## Install
 
-- ✅ Generate `llms.txt` and `llms-full.txt` from a single config
-- ✅ Build canonical URLs from content manifests
-- ✅ Lint content policies (restricted claims, geo policy)
-- ✅ CI-friendly exit codes for automated checks
-- ✅ Next.js adapter for static export
-- ✅ Multi-locale support with canonical URL generation
-- ✅ Citations.json generation for structured data
+```bash
+pnpm add @pas7/llm-seo
+```
 
 ## Quick Start
 
-### Install
-
-```bash
-pnpm add -D @pas7/llm-seo
-# or
-npm install --save-dev @pas7/llm-seo
-```
-
-### Create Config
-
-```typescript
+```ts
 // llm-seo.config.ts
 import type { LlmsSeoConfig } from '@pas7/llm-seo';
 
 export default {
   site: {
-    baseUrl: 'https://yourdomain.com',
+    baseUrl: 'https://example.com',
     defaultLocale: 'en',
   },
   brand: {
-    name: 'Your Brand',
-    tagline: 'Your tagline',
-    description: 'Your description',
-    locales: ['en'],
+    name: 'Pas7 Studio',
+    tagline: 'Automation and SEO infra for modern products',
+    description: 'Deterministic LLM/GEO SEO artifacts for static and hybrid sites.',
+    locales: ['en', 'uk'],
   },
   sections: {
-    hubs: ['/services', '/blog', '/contact'],
+    hubs: ['/services', '/blog', '/projects', '/cases', '/contact'],
   },
   manifests: {
-    // Your content manifests
+    blog: [
+      { slug: '/blog/llm-seo-basics', locales: ['en', 'uk'] },
+      { slug: '/blog/canonical-strategy', locales: ['en'] },
+    ],
   },
   contact: {
-    email: 'contact@yourdomain.com',
+    email: 'contact@example.com',
+  },
+  policy: {
+    citationRules: 'Prefer canonical URLs. Avoid query params and tracking tags.',
+    restrictedClaims: {
+      enable: true,
+      forbidden: ['best', '#1', 'guaranteed'],
+      whitelist: ['best practices'],
+    },
   },
   output: {
     paths: {
       llmsTxt: 'public/llms.txt',
       llmsFullTxt: 'public/llms-full.txt',
+      citations: 'public/citations.json',
     },
   },
   format: {
     trailingSlash: 'never',
     lineEndings: 'lf',
+    localeStrategy: 'prefix',
   },
 } satisfies LlmsSeoConfig;
 ```
 
-### Generate
-
 ```bash
-npx llm-seo generate
+pnpm llm-seo generate --config llm-seo.config.ts
+pnpm llm-seo check --config llm-seo.config.ts --fail-on error
+pnpm llm-seo doctor --site https://example.com
 ```
 
-### Check (for CI)
-
-```bash
-npx llm-seo check --fail-on error
-```
-
-## CLI Reference
+## CLI
 
 ### `llm-seo generate`
-
-Generate LLM SEO artifacts.
 
 ```bash
 llm-seo generate [options]
 
 Options:
-  -c, --config <path>     Config file path (default: "llm-seo.config.ts")
-  --dry-run               Output to stdout instead of files
-  --emit-citations        Generate citations.json
-  -v, --verbose           Enable verbose output
+  -c, --config <path>   Path to config file
+  --dry-run             Print output to stdout, do not write files
+  --emit-citations      Emit citations.json
+  -v, --verbose         Verbose logs
 ```
 
 ### `llm-seo check`
-
-Validate generated files against expected output.
 
 ```bash
 llm-seo check [options]
 
 Options:
-  -c, --config <path>     Config file path
-  --fail-on <level>       Fail on 'warn' or 'error' (default: 'error')
-  -v, --verbose           Enable verbose output
+  -c, --config <path>   Path to config file
+  --fail-on <level>     fail threshold: warn|error (default: error)
+  -v, --verbose         Verbose logs
 ```
 
 ### `llm-seo doctor`
-
-Diagnose site configuration.
 
 ```bash
 llm-seo doctor [options]
 
 Options:
-  -s, --site <url>        Site URL to check
-  -c, --config <path>     Config file path
-  -v, --verbose           Enable verbose output
+  -s, --site <url>      Site URL to check
+  -c, --config <path>   Path to config file
+  -v, --verbose         Verbose logs
 ```
 
-## Library API
+## Exit Codes
 
-```typescript
+- `0` OK
+- `1` warnings (only when `--fail-on warn`)
+- `2` errors
+- `3` doctor network/availability failure
+
+## API (Core)
+
+```ts
 import {
-  // Generation
   createLlmsTxt,
   createLlmsFullTxt,
+  createCanonicalUrlsFromManifest,
   createCitationsJson,
-  generateCanonicalUrl,
-  
-  // Validation
-  checkManifest,
-  validate,
-  
-  // Types
-  type LlmsSeoConfig,
-  type PageManifest,
+  checkGeneratedFiles,
 } from '@pas7/llm-seo';
 ```
 
-### Example: Generate llms.txt programmatically
+## Docs
 
-```typescript
-import { createLlmsTxt, type LlmsSeoConfig } from '@pas7/llm-seo';
+- [`docs/format.md`](./docs/format.md)
+- [`docs/config.md`](./docs/config.md)
+- [`docs/policies.md`](./docs/policies.md)
+- [`docs/ci.md`](./docs/ci.md)
+- [`docs/nextjs.md`](./docs/nextjs.md)
 
-const config: LlmsSeoConfig = {
-  // ... your config
-};
+## Next.js
 
-const result = createLlmsTxt(config);
-console.log(result.content);
-```
+Use helpers from `@pas7/llm-seo/adapters/next` to normalize manifest items and build scripts.
+See [`examples/next-static-export`](./examples/next-static-export).
 
-### Example: Generate canonical URLs from manifest
+## Contributing and Security
 
-```typescript
-import { generateCanonicalUrl, type PageManifest } from '@pas7/llm-seo';
+- [`CONTRIBUTING.md`](./CONTRIBUTING.md)
+- [`SECURITY.md`](./SECURITY.md)
+- [`CODE_OF_CONDUCT.md`](./CODE_OF_CONDUCT.md)
 
-const page: PageManifest = {
-  slug: '/blog/my-post',
-  locales: ['en', 'uk'],
-  publishedAt: '2024-01-15',
-};
+## Support
 
-const canonicalUrl = generateCanonicalUrl({
-  baseUrl: 'https://example.com',
-  page,
-  locale: 'en',
-});
-// https://example.com/blog/my-post
-```
-
-## Documentation
-
-- [Format Reference](./docs/format.md) - llms.txt vs llms-full.txt formats
-- [Config Reference](./docs/config.md) - Full configuration options
-- [Policies](./docs/policies.md) - Content policies and restricted claims
-- [CI Integration](./docs/ci.md) - GitHub Actions setup
-- [Next.js Integration](./docs/nextjs.md) - Static export setup
-
-## Examples
-
-See the [`examples/next-static-export`](./examples/next-static-export/) directory for a complete Next.js static export example with:
-- Configuration setup
-- Content manifests
-- Build integration
-
-## Contributing
-
-See [CONTRIBUTING.md](./CONTRIBUTING.md) for development setup and guidelines.
+Need custom SEO automation infra? Contact PAS7 Studio:
+- https://pas7.com.ua/
+- https://pas7.com.ua/contact
 
 ## License
 
-MIT © Pas7 Studio
-
----
-
-**Need automation or SEO infra?** Contact [Pas7 Studio](https://pas7.studio)
+MIT

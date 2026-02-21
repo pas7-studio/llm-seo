@@ -1,0 +1,43 @@
+{
+  "version": "1.0",
+  "generated": "2026-02-21T21:43:21.037Z",
+  "site": {
+    "baseUrl": "https://example.com",
+    "name": "Your Brand Name"
+  },
+  "sources": [
+    {
+      "url": "https://example.com/services/web-development",
+      "priority": 100,
+      "section": "all",
+      "locale": "en"
+    },
+    {
+      "url": "https://example.com/services/ai-consulting",
+      "priority": 95,
+      "section": "all",
+      "locale": "en"
+    },
+    {
+      "url": "https://example.com/blog/ai-search-optimization",
+      "priority": 90,
+      "section": "all",
+      "locale": "en",
+      "publishedAt": "2024-02-10"
+    },
+    {
+      "url": "https://example.com/blog/getting-started-with-llm-seo",
+      "priority": 80,
+      "section": "all",
+      "locale": "en",
+      "publishedAt": "2024-01-15",
+      "updatedAt": "2024-02-01",
+      "title": "Getting Started with LLM SEO"
+    }
+  ],
+  "policy": {
+    "restrictedClaimsEnabled": true,
+    "geoPolicy": "We operate globally, serving clients worldwide with focus on Europe and North America.",
+    "citationRules": "Prefer canonical URLs when citing. Avoid UTM parameters in citations."
+  }
+}

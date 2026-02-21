@@ -5,7 +5,6 @@
 
 import { readFile, writeFile, mkdir, access, stat, rename, unlink } from 'node:fs/promises';
 import { dirname, join, basename } from 'node:path';
-import { tmpdir } from 'node:os';
 import { randomBytes } from 'node:crypto';
 
 /**
@@ -108,17 +107,6 @@ export async function getFileStats(
   } catch {
     return null;
   }
-}
-
-/**
- * Generates a unique temporary file path.
- * @param originalPath - Original file path for reference
- * @returns Temporary file path
- */
-function getTempFilePath(originalPath: string): string {
-  const uniqueId = randomBytes(8).toString('hex');
-  const baseName = basename(originalPath);
-  return join(tmpdir(), `llm-seo-${uniqueId}-${baseName}.tmp`);
 }
 
 /**

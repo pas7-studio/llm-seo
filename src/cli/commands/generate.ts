@@ -6,9 +6,8 @@
 import type { LlmsSeoConfig } from '../../schema/config.schema.js';
 import type { ManifestItem } from '../../schema/manifest.schema.js';
 import { loadConfig, type LoadConfigResult } from '../io/load-config.js';
-import { writeFileAtomic, fileExists, getFileStats } from '../io/fs.js';
+import { writeFileAtomic } from '../io/fs.js';
 import {
-  printSuccess,
   printError,
   printWarning,
   printInfo,
@@ -23,7 +22,7 @@ import {
   createLlmsTxt,
   createLlmsFullTxt,
   createCitationsJsonString,
-  extractCanonicalUrls,
+  createCanonicalUrlsFromManifest,
 } from '../../core/index.js';
 
 /**
@@ -99,7 +98,13 @@ export async function generateCommand(options: GenerateOptions): Promise<number>
     }
     
     // Step 3: Build canonical URLs
-    const canonicalUrls = buildCanonicalUrls(config, manifestItems);
+    const canonicalUrls = createCanonicalUrlsFromManifest({
+      items: manifestItems,
+      baseUrl: config.site.baseUrl,
+      defaultLocale: config.site.defaultLocale ?? config.brand.locales[0] ?? 'en',
+      trailingSlash: config.format?.trailingSlash ?? 'never',
+      localeStrategy: 'prefix',
+    });
     
     if (verbose) {
       printVerbose(`Generated ${canonicalUrls.length} canonical URLs`);
@@ -118,7 +123,11 @@ export async function generateCommand(options: GenerateOptions): Promise<number>
     // Step 6: Optionally generate citations.json
     let citationsContent: string | null = null;
     if (emitCitations) {
-      citationsContent = createCitationsJsonString({ config, canonicalUrls });
+      citationsContent = createCitationsJsonString({
+        config,
+        manifestItems,
+        sectionName: 'all',
+      });
     }
     
     // Step 7: Output files or stdout
@@ -215,16 +224,9 @@ function extractManifestItems(config: LlmsSeoConfig): ManifestItem[] {
       // Check if it has pages array
       if (Array.isArray(data.pages)) {
         for (const page of data.pages) {
-          if (typeof page === 'object' && page !== null) {
-            const pageData = page as Record<string, unknown>;
-            
-            items.push({
-              slug: String(pageData.slug ?? pageData.path ?? ''),
-              title: pageData.title as string | undefined,
-              description: pageData.description as string | undefined,
-              locales: pageData.locales as string[] | undefined,
-              canonicalOverride: pageData.canonicalOverride as string | undefined,
-            });
+          const normalized = toManifestItem(page);
+          if (normalized) {
+            items.push(normalized);
           }
         }
       }
@@ -232,16 +234,9 @@ function extractManifestItems(config: LlmsSeoConfig): ManifestItem[] {
       // Check if it's an array directly
       if (Array.isArray(data)) {
         for (const item of data) {
-          if (typeof item === 'object' && item !== null) {
-            const itemData = item as Record<string, unknown>;
-            
-            items.push({
-              slug: String(itemData.slug ?? itemData.path ?? ''),
-              title: itemData.title as string | undefined,
-              description: itemData.description as string | undefined,
-              locales: itemData.locales as string[] | undefined,
-              canonicalOverride: itemData.canonicalOverride as string | undefined,
-            });
+          const normalized = toManifestItem(item);
+          if (normalized) {
+            items.push(normalized);
           }
         }
       }
@@ -251,38 +246,47 @@ function extractManifestItems(config: LlmsSeoConfig): ManifestItem[] {
   return items;
 }
 
-/**
- * Builds canonical URLs from config and manifest items.
- * @param config - LLM SEO config
- * @param manifestItems - Manifest items
- * @returns Array of canonical URLs
- */
-function buildCanonicalUrls(config: LlmsSeoConfig, manifestItems: ManifestItem[]): string[] {
-  const urls: string[] = [];
-  const baseUrl = config.site.baseUrl;
-  
-  // Add URLs from manifest items
-  for (const item of manifestItems) {
-    if (item.canonicalOverride) {
-      urls.push(item.canonicalOverride);
-    } else if (item.slug) {
-      // Ensure slug starts with /
-      const slug = item.slug.startsWith('/') ? item.slug : `/${item.slug}`;
-      urls.push(`${baseUrl}${slug}`);
+function toManifestItem(value: unknown): ManifestItem | null {
+  if (typeof value !== 'object' || value === null) {
+    return null;
+  }
+
+  const data = value as Record<string, unknown>;
+  const rawSlug = data.slug ?? data.path;
+  if (typeof rawSlug !== 'string' || rawSlug.length === 0) {
+    return null;
+  }
+
+  const item: ManifestItem = {
+    slug: rawSlug.startsWith('/') ? rawSlug : `/${rawSlug}`,
+  };
+
+  if (typeof data.title === 'string') {
+    item.title = data.title;
+  }
+  if (typeof data.description === 'string') {
+    item.description = data.description;
+  }
+  if (Array.isArray(data.locales)) {
+    const locales = data.locales.filter((loc): loc is string => typeof loc === 'string');
+    if (locales.length > 0) {
+      item.locales = locales;
     }
   }
-  
-  // Use the extractCanonicalUrls function if available
-  try {
-    const extractedUrls = extractCanonicalUrls(manifestItems, { baseUrl });
-    if (extractedUrls.length > 0) {
-      return extractedUrls;
-    }
-  } catch {
-    // Fall back to manually built URLs
+  if (typeof data.canonicalOverride === 'string') {
+    item.canonicalOverride = data.canonicalOverride;
   }
-  
-  return urls;
+  if (typeof data.publishedAt === 'string') {
+    item.publishedAt = data.publishedAt;
+  }
+  if (typeof data.updatedAt === 'string') {
+    item.updatedAt = data.updatedAt;
+  }
+  if (typeof data.priority === 'number') {
+    item.priority = data.priority;
+  }
+
+  return item;
 }
 
 // Legacy export for backwards compatibility
