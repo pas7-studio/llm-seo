@@ -12,6 +12,7 @@ Deterministic LLM SEO artifacts generator & validator for modern static sites (N
 One config in, deterministic artifacts out:
 - generate `llms.txt` and `llms-full.txt`
 - build canonical URLs from manifest items
+- support mixed routing per manifest section (`prefix`, `suffix`, `locale-segment`, `custom`)
 - lint policy constraints (restricted claims, duplicates, empty sections)
 - check generated files in CI with explicit exit codes
 
@@ -42,10 +43,18 @@ export default {
     hubs: ['/services', '/blog', '/projects', '/cases', '/contact'],
   },
   manifests: {
-    blog: [
-      { slug: '/blog/llm-seo-basics', locales: ['en', 'uk'] },
-      { slug: '/blog/canonical-strategy', locales: ['en'] },
-    ],
+    blog: {
+      sectionPath: '/blog',
+      routeStyle: 'locale-segment',
+      items: [
+        { slug: '/llm-seo-basics', locales: ['en', 'uk'] },
+        { slug: '/canonical-strategy', locales: ['en'] },
+      ],
+    },
+    contactPages: {
+      routeStyle: 'suffix',
+      items: [{ slug: '/contact', locales: ['en', 'uk'] }],
+    },
   },
   contact: {
     email: 'contact@example.com',
@@ -146,6 +155,17 @@ import {
 
 Use helpers from `@pas7/llm-seo/adapters/next` to normalize manifest items and build scripts.
 See [`examples/next-static-export`](./examples/next-static-export).
+Works with `@pas7/nextjs-sitemap-hreflang` in one build pipeline:
+
+```bash
+llm-seo generate --config llm-seo.config.ts
+next build
+nextjs-sitemap-hreflang check --in out/sitemap.xml --fail-on-missing
+llm-seo check --config llm-seo.config.ts --fail-on error
+```
+
+Hybrid routing example:
+- [`examples/next-static-export-hybrid-routing`](./examples/next-static-export-hybrid-routing)
 
 ## Contributing and Security
 

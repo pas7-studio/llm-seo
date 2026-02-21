@@ -3,7 +3,13 @@
  */
 
 import { ZodType, ZodError } from 'zod';
-import { LlmsSeoConfigSchema, type LlmsSeoConfig, type ContactConfig } from './config.schema.js';
+import {
+  LlmsSeoConfigSchema,
+  type LlmsSeoConfig,
+  type ContactConfig,
+  type ManifestConfigValue,
+  type ManifestSectionConfig,
+} from './config.schema.js';
 import type { ManifestItem } from './manifest.schema.js';
 
 /**
@@ -199,17 +205,12 @@ function validateHubPaths(hubs: string[]): ValidationIssue[] {
  * @param manifests - The manifests record
  * @returns Array of validation issues
  */
-function validateManifestItems(manifests: Record<string, unknown>): ValidationIssue[] {
+function validateManifestItems(manifests: Record<string, ManifestConfigValue>): ValidationIssue[] {
   const issues: ValidationIssue[] = [];
   
   for (const [manifestName, manifestValue] of Object.entries(manifests)) {
-    // Skip if not an array (could be ManifestSource)
-    if (!Array.isArray(manifestValue)) {
-      continue;
-    }
-    
+    const items = getManifestItems(manifestValue);
     const seen = new Map<string, number>();
-    const items = manifestValue as ManifestItem[];
     
     for (let i = 0; i < items.length; i++) {
       const item = items[i];
@@ -247,6 +248,13 @@ function validateManifestItems(manifests: Record<string, unknown>): ValidationIs
   }
   
   return issues;
+}
+
+function getManifestItems(manifestValue: ManifestConfigValue): ManifestItem[] {
+  if (Array.isArray(manifestValue)) {
+    return manifestValue;
+  }
+  return manifestValue.items;
 }
 
 /**
@@ -302,6 +310,56 @@ function validateDefaultLocale(defaultLocale: string | undefined, locales: strin
   return issues;
 }
 
+function validateManifestLocaleOverrides(config: LlmsSeoConfig): ValidationIssue[] {
+  const issues: ValidationIssue[] = [];
+
+  for (const [sectionName, sectionValue] of Object.entries(config.manifests)) {
+    if (Array.isArray(sectionValue)) {
+      continue;
+    }
+
+    const section = sectionValue as ManifestSectionConfig;
+    if (section.defaultLocaleOverride && !config.brand.locales.includes(section.defaultLocaleOverride)) {
+      issues.push({
+        path: `manifests.${sectionName}.defaultLocaleOverride`,
+        code: 'invalid_default_locale_override',
+        message: `defaultLocaleOverride "${section.defaultLocaleOverride}" must exist in brand.locales [${config.brand.locales.join(', ')}]`,
+        severity: 'error',
+      });
+    }
+
+    if (section.sectionPath) {
+      if (!section.sectionPath.startsWith('/')) {
+        issues.push({
+          path: `manifests.${sectionName}.sectionPath`,
+          code: 'invalid_section_path',
+          message: `sectionPath "${section.sectionPath}" must start with "/"`,
+          severity: 'error',
+        });
+      }
+      if (section.sectionPath.includes('?') || section.sectionPath.includes('#') || section.sectionPath.includes('//')) {
+        issues.push({
+          path: `manifests.${sectionName}.sectionPath`,
+          code: 'invalid_section_path',
+          message: `sectionPath "${section.sectionPath}" must not contain query/hash/double-slash`,
+          severity: 'error',
+        });
+      }
+    }
+
+    if (section.routeStyle === 'custom' && !section.pathnameFor) {
+      issues.push({
+        path: `manifests.${sectionName}.pathnameFor`,
+        code: 'missing_custom_pathname',
+        message: 'pathnameFor is required when routeStyle is "custom"',
+        severity: 'error',
+      });
+    }
+  }
+
+  return issues;
+}
+
 /**
  * Validates the full LlmsSeoConfig with custom validation rules.
  * @param data - The configuration data to validate
@@ -330,7 +388,8 @@ export function validateLlmsSeoConfig(data: unknown): ValidationResult<LlmsSeoCo
   
   // Validate manifest items
   if (config.manifests && typeof config.manifests === 'object') {
-    issues.push(...validateManifestItems(config.manifests as Record<string, unknown>));
+    issues.push(...validateManifestItems(config.manifests));
+    issues.push(...validateManifestLocaleOverrides(config));
   }
   
   // Validate contact

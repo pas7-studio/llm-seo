@@ -99,7 +99,7 @@ Content manifests. Optional, defaults to `{}`.
 
 ```typescript
 manifests: {
-  [sectionName: string]: PageManifest[];
+  [sectionName: string]: PageManifest[] | ManifestSectionConfig;
 }
 
 interface PageManifest {
@@ -124,30 +124,48 @@ interface PageManifest {
   /** Page description */
   description?: string;
 }
+
+type RouteStyle = 'prefix' | 'suffix' | 'locale-segment' | 'custom';
+
+interface ManifestSectionConfig {
+  items: PageManifest[];
+  sectionName?: string;
+  routeStyle?: RouteStyle;
+  sectionPath?: string;
+  defaultLocaleOverride?: string;
+  pathnameFor?: (args: {
+    item: PageManifest;
+    sectionName: string;
+    slug: string;
+    locale: string;
+    defaultLocale: string;
+    sectionPath: string;
+  }) => string;
+}
 ```
 
 **Example:**
 
 ```typescript
 manifests: {
-  blog: [
-    {
-      slug: '/blog/getting-started',
-      locales: ['en', 'uk'],
-      publishedAt: '2024-01-15',
-      updatedAt: '2024-02-01',
-      priority: 80,
-      title: 'Getting Started with LLM SEO',
-      description: 'Complete guide to optimizing for LLMs',
-    },
-  ],
-  services: [
-    {
-      slug: '/services/consulting',
-      locales: ['en'],
-      priority: 100,
-    },
-  ],
+  blog: {
+    sectionPath: '/blog',
+    routeStyle: 'locale-segment',
+    items: [
+      {
+        slug: '/getting-started',
+        locales: ['en', 'uk'],
+        publishedAt: '2024-01-15',
+        updatedAt: '2024-02-01',
+        priority: 80,
+        title: 'Getting Started with LLM SEO',
+      },
+    ],
+  },
+  contactPages: {
+    routeStyle: 'suffix',
+    items: [{ slug: '/contact', locales: ['en', 'uk'] }],
+  },
 }
 ```
 

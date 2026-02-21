@@ -19,9 +19,30 @@ export default {
     hubs: ['/services', '/blog', '/projects', '/cases', '/contact'],
   },
   manifests: {
-    blog: blogManifest.items,
-    services: servicesManifest.items,
-    cases: casesManifest.items,
+    blog: {
+      sectionPath: '/blog',
+      routeStyle: 'locale-segment',
+      items: blogManifest.items.map((item) => ({
+        ...item,
+        slug: item.slug.replace(/^\/blog/, '') || '/',
+      })),
+    },
+    services: {
+      sectionPath: '/services',
+      routeStyle: 'prefix',
+      items: servicesManifest.items.map((item) => ({
+        ...item,
+        slug: item.slug.replace(/^\/services/, '') || '/',
+      })),
+    },
+    cases: {
+      sectionPath: '/cases',
+      routeStyle: 'prefix',
+      items: casesManifest.items.map((item) => ({
+        ...item,
+        slug: item.slug.replace(/^\/cases/, '') || '/',
+      })),
+    },
   },
   contact: {
     email: 'contact@pas7.studio',

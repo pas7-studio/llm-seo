@@ -28,6 +28,28 @@ export type LocaleStrategy = 'prefix' | 'subdomain' | 'none';
 export type TrailingSlashPolicy = 'always' | 'never' | 'preserve';
 
 /**
+ * Section-level route style for canonical path generation.
+ */
+export type RouteStyle = 'prefix' | 'suffix' | 'locale-segment' | 'custom';
+
+/**
+ * Arguments for custom pathname generation.
+ */
+export interface CanonicalPathnameArgs {
+  item: ManifestItem;
+  sectionName: string;
+  slug: string;
+  locale: string;
+  defaultLocale: string;
+  sectionPath: string;
+}
+
+/**
+ * Custom path function used when routeStyle="custom".
+ */
+export type CanonicalPathnameFor = (args: CanonicalPathnameArgs) => string;
+
+/**
  * Options for creating canonical URLs from manifest.
  */
 export interface CreateCanonicalUrlsOptions {
@@ -43,6 +65,14 @@ export interface CreateCanonicalUrlsOptions {
   trailingSlash: TrailingSlashPolicy;
   /** Locale URL strategy */
   localeStrategy: LocaleStrategy;
+  /** Route style for this manifest block */
+  routeStyle?: RouteStyle;
+  /** Optional section name (used in custom pathname args) */
+  sectionName?: string;
+  /** Optional section path prefix */
+  sectionPath?: string;
+  /** Optional custom pathname override for routeStyle="custom" */
+  pathnameFor?: CanonicalPathnameFor;
 }
 
 /**
@@ -89,36 +119,6 @@ export function dedupeUrls(urls: string[]): string[] {
 }
 
 /**
- * Builds locale prefix based on strategy.
- * @param locale - The locale code
- * @param strategy - The locale strategy
- * @param defaultLocale - The default locale code
- * @returns Locale prefix string or empty string
- */
-function buildLocalePrefix(
-  locale: string,
-  strategy: LocaleStrategy,
-  defaultLocale: string
-): string {
-  // No prefix for 'none' strategy
-  if (strategy === 'none') {
-    return '';
-  }
-
-  // Subdomain strategy doesn't add path prefix
-  if (strategy === 'subdomain') {
-    return '';
-  }
-
-  // For prefix strategy, don't prefix default locale
-  if (strategy === 'prefix' && locale === defaultLocale) {
-    return '';
-  }
-
-  return `/${locale}`;
-}
-
-/**
  * Builds base URL with subdomain if needed.
  * @param baseUrl - The base URL
  * @param locale - The locale code
@@ -154,7 +154,17 @@ export function createCanonicalUrlForItem(
   item: ManifestItem,
   options: Omit<CreateCanonicalUrlsOptions, 'items'>
 ): string {
-  const { baseUrl, routePrefix, defaultLocale, trailingSlash, localeStrategy } = options;
+  const {
+    baseUrl,
+    routePrefix,
+    defaultLocale,
+    trailingSlash,
+    localeStrategy,
+    routeStyle,
+    sectionName,
+    sectionPath,
+    pathnameFor,
+  } = options;
 
   // If item has canonicalOverride, use it directly
   if (item.canonicalOverride && typeof item.canonicalOverride === 'string') {
@@ -171,26 +181,36 @@ export function createCanonicalUrlForItem(
   // If no locale available, use default
   const locale = canonicalLocale ?? defaultLocale;
 
-  // Build URL parts
-  const localePrefix = buildLocalePrefix(locale, localeStrategy, defaultLocale);
+  const sectionBase = normalizeSectionPath(sectionPath ?? routePrefix ?? '');
+  const effectiveRouteStyle = routeStyle ?? inferRouteStyleFromLocaleStrategy(localeStrategy);
+  const normalizedSlug = normalizeItemSlug(item.slug, sectionBase);
+
+  const customPath = effectiveRouteStyle === 'custom'
+    ? pathnameFor?.({
+      item,
+      sectionName: sectionName ?? '',
+      slug: normalizedSlug,
+      locale,
+      defaultLocale,
+      sectionPath: sectionBase,
+    })
+    : undefined;
+
+  const resolvedPath = customPath ?? buildPathFromRouteStyle({
+    routeStyle: effectiveRouteStyle,
+    sectionPath: sectionBase,
+    slug: normalizedSlug,
+    locale,
+    defaultLocale,
+  });
+
+  // Keep existing subdomain support from localeStrategy.
   const effectiveBaseUrl = buildBaseUrlWithSubdomain(baseUrl, locale, localeStrategy, defaultLocale);
-
-  // Build the path
-  const parts: string[] = [];
-  if (localePrefix) {
-    parts.push(localePrefix);
-  }
-  if (routePrefix) {
-    parts.push(routePrefix);
-  }
-  parts.push(item.slug);
-
-  const fullPath = joinUrlParts(...parts);
 
   // Normalize the URL
   return normalizeUrl({
     baseUrl: effectiveBaseUrl,
-    path: fullPath,
+    path: resolvedPath,
     trailingSlash,
     stripQuery: true,
     stripHash: true,
@@ -224,4 +244,70 @@ export function createCanonicalUrlsFromManifest(options: CreateCanonicalUrlsOpti
 
   // Sort stably by path
   return sortUrlsByPath(deduped);
+}
+
+function inferRouteStyleFromLocaleStrategy(strategy: LocaleStrategy): RouteStyle {
+  if (strategy !== 'prefix') {
+    return 'custom';
+  }
+  return 'prefix';
+}
+
+function buildPathFromRouteStyle(args: {
+  routeStyle: RouteStyle;
+  sectionPath: string;
+  slug: string;
+  locale: string;
+  defaultLocale: string;
+}): string {
+  const { routeStyle, sectionPath, slug, locale, defaultLocale } = args;
+  const includeLocale = locale !== defaultLocale;
+
+  if (routeStyle === 'locale-segment') {
+    return joinUrlParts(sectionPath, locale, slug);
+  }
+
+  if (routeStyle === 'suffix') {
+    if (includeLocale) {
+      return joinUrlParts(sectionPath, slug, locale);
+    }
+    return joinUrlParts(sectionPath, slug);
+  }
+
+  if (routeStyle === 'custom') {
+    // Legacy localeStrategy="none" fallback when custom builder is not provided.
+    return joinUrlParts(sectionPath, slug);
+  }
+
+  // "prefix"
+  if (includeLocale) {
+    return joinUrlParts(locale, sectionPath, slug);
+  }
+  return joinUrlParts(sectionPath, slug);
+}
+
+function normalizeSectionPath(sectionPath: string): string {
+  if (!sectionPath || sectionPath === '/') {
+    return '';
+  }
+  return sectionPath.startsWith('/') ? sectionPath : `/${sectionPath}`;
+}
+
+function normalizeItemSlug(slug: string, sectionPath: string): string {
+  const normalizedSlug = slug.startsWith('/') ? slug : `/${slug}`;
+  if (!sectionPath) {
+    return normalizedSlug;
+  }
+
+  if (normalizedSlug === sectionPath) {
+    return '/';
+  }
+
+  const withSlash = `${sectionPath}/`;
+  if (normalizedSlug.startsWith(withSlash)) {
+    const relative = normalizedSlug.slice(withSlash.length);
+    return relative ? `/${relative}` : '/';
+  }
+
+  return normalizedSlug;
 }

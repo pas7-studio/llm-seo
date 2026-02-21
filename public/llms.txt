@@ -14,8 +14,9 @@ Your brand description. This helps LLMs understand what your site is about.
 
 ## URLs
 
-- https://example.com/blog/ai-search-optimization
-- https://example.com/blog/getting-started-with-llm-seo
+- https://example.com/blog/en/ai-search-optimization
+- https://example.com/blog/en/getting-started-with-llm-seo
+- https://example.com/contact
 - https://example.com/services/ai-consulting
 - https://example.com/services/web-development
 

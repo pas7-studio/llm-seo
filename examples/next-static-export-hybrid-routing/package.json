@@ -1,0 +1,12 @@
+{
+  "name": "next-static-export-hybrid-routing",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build:seo": "llm-seo generate --config llm-seo.config.ts",
+    "build": "next build",
+    "check:sitemap": "nextjs-sitemap-hreflang check --in out/sitemap.xml --fail-on-missing",
+    "check:seo": "llm-seo check --config llm-seo.config.ts --fail-on error",
+    "pipeline": "pnpm build:seo && pnpm build && pnpm check:sitemap && pnpm check:seo"
+  }
+}

@@ -11,9 +11,19 @@ export {
   ConfigSchema,
   CheckConfigSchema,
   FullConfigSchema,
+  RouteStyleSchema,
+  ManifestSectionConfigSchema,
+  ManifestConfigValueSchema,
+  ManifestsConfigSchema,
   type Config,
   type CheckConfig,
   type FullConfig,
+  type RouteStyle,
+  type ManifestPathnameArgs,
+  type ManifestPathnameFor,
+  type ManifestSectionConfig,
+  type ManifestConfigValue,
+  type ManifestsConfig,
 } from './schema/config.schema.js';
 
 export {

@@ -399,6 +399,58 @@ describe('LlmsSeoConfigSchema', () => {
         e.code === 'empty_slug' || e.code === 'too_small'
       )).toBe(true);
     });
+
+    it('should accept section-level manifest config with routing fields', () => {
+      const data = {
+        ...createValidConfig(),
+        manifests: {
+          blog: {
+            items: [
+              { slug: '/llm-seo', locales: ['en', 'uk'] },
+            ],
+            sectionName: 'Blog',
+            routeStyle: 'locale-segment',
+            sectionPath: '/blog',
+            defaultLocaleOverride: 'en',
+          },
+        },
+      };
+
+      const result = validateLlmsSeoConfig(data);
+      expect(result.success).toBe(true);
+    });
+
+    it('should reject invalid defaultLocaleOverride not in brand.locales', () => {
+      const data = {
+        ...createValidConfig(),
+        manifests: {
+          blog: {
+            items: [{ slug: '/llm-seo' }],
+            defaultLocaleOverride: 'fr',
+          },
+        },
+      };
+
+      const result = validateLlmsSeoConfig(data);
+      expect(result.success).toBe(false);
+      expect(result.issues?.some((e) => e.code === 'invalid_default_locale_override')).toBe(true);
+    });
+
+    it('should reject custom routeStyle without pathnameFor', () => {
+      const data = {
+        ...createValidConfig(),
+        manifests: {
+          legal: {
+            items: [{ slug: '/terms' }],
+            routeStyle: 'custom',
+          },
+        },
+      };
+
+      const result = validateLlmsSeoConfig(data);
+      expect(result.success).toBe(false);
+      expect(result.issues?.some((e) => e.code === 'missing_custom_pathname')).toBe(true);
+    });
   });
 
   describe('contact validation', () => {

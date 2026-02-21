@@ -10,6 +10,25 @@ Next.js with static export is a perfect match for LLM SEO:
 - **Build-time generation** - Artifacts generated during build
 - **No runtime overhead** - Everything is pre-generated
 
+## Cross-Package Pipeline
+
+`@pas7/llm-seo` works with `@pas7/nextjs-sitemap-hreflang` in one deterministic pipeline:
+
+```bash
+llm-seo generate --config llm-seo.config.ts
+next build
+nextjs-sitemap-hreflang check --in out/sitemap.xml --fail-on-missing
+llm-seo check --config llm-seo.config.ts --fail-on error
+```
+
+Recommended setup:
+- keep one shared `settings.siteUrl` value
+- use it in `llm-seo.config.ts`, `robots`, and sitemap-hreflang config
+- run sitemap-hreflang check before `llm-seo check` in CI
+
+See hybrid example:
+- `examples/next-static-export-hybrid-routing`
+
 ## Installation
 
 ```bash

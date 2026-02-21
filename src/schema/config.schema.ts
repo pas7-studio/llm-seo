@@ -4,6 +4,7 @@
  */
 
 import { z } from 'zod';
+import { ManifestItemSchema, type ManifestItem } from './manifest.schema.js';
 
 /**
  * Schema for site configuration.
@@ -59,6 +60,88 @@ export const SectionsConfigSchema = z.object({
  * Type for sections configuration.
  */
 export type SectionsConfig = z.infer<typeof SectionsConfigSchema>;
+
+/**
+ * Section-level route style for canonical URL generation.
+ */
+export const RouteStyleSchema = z.enum(['prefix', 'suffix', 'locale-segment', 'custom']);
+
+/**
+ * Type for section-level route style.
+ */
+export type RouteStyle = z.infer<typeof RouteStyleSchema>;
+
+/**
+ * Arguments passed to custom pathname generator.
+ */
+export interface ManifestPathnameArgs {
+  /** Raw manifest item */
+  item: ManifestItem;
+  /** Manifest section key, e.g. "blog" */
+  sectionName: string;
+  /** Item slug normalized with leading slash */
+  slug: string;
+  /** Selected canonical locale */
+  locale: string;
+  /** Section default locale */
+  defaultLocale: string;
+  /** Section path prefix, e.g. "/blog" */
+  sectionPath: string;
+}
+
+/**
+ * Custom pathname generator for routeStyle="custom".
+ */
+export type ManifestPathnameFor = (args: ManifestPathnameArgs) => string;
+
+/**
+ * Schema for section-level manifest config.
+ */
+export const ManifestSectionConfigSchema = z.object({
+  /** Items in this manifest section */
+  items: z.array(ManifestItemSchema),
+  /** Optional display name for section */
+  sectionName: z.string().optional(),
+  /** Routing behavior for this section */
+  routeStyle: RouteStyleSchema.optional(),
+  /** Section path prefix, e.g. "/blog" */
+  sectionPath: z.string().optional(),
+  /** Per-section default locale override */
+  defaultLocaleOverride: z.string().min(2).optional(),
+  /** Custom pathname factory for routeStyle="custom" */
+  pathnameFor: z.custom<ManifestPathnameFor>(
+    (value) => value === undefined || typeof value === 'function',
+    { message: 'pathnameFor must be a function' }
+  ).optional(),
+});
+
+/**
+ * Type for section-level manifest config.
+ */
+export type ManifestSectionConfig = z.infer<typeof ManifestSectionConfigSchema>;
+
+/**
+ * Schema for one manifests entry value.
+ */
+export const ManifestConfigValueSchema = z.union([
+  z.array(ManifestItemSchema),
+  ManifestSectionConfigSchema,
+]);
+
+/**
+ * Type for one manifests entry value.
+ */
+export type ManifestConfigValue = z.infer<typeof ManifestConfigValueSchema>;
+
+/**
+ * Schema for manifests map.
+ */
+export const ManifestsConfigSchema = z.record(z.string(), ManifestConfigValueSchema);
+
+/**
+ * Type for manifests map.
+ */
+export type ManifestsConfig = z.infer<typeof ManifestsConfigSchema>;
 
 /**
  * Schema for social links configuration.
@@ -221,7 +304,7 @@ export const LlmsSeoConfigSchema = z.object({
   /** Sections configuration */
   sections: SectionsConfigSchema.optional(),
   /** Manifests configuration */
-  manifests: z.record(z.unknown()).default({}),
+  manifests: ManifestsConfigSchema.default({}),
   /** Contact configuration */
   contact: ContactConfigSchema.optional(),
   /** Policy configuration */

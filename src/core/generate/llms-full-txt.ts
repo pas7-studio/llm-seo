@@ -18,6 +18,12 @@ export interface CreateLlmsFullTxtOptions {
   canonicalUrls: string[];
   /** Manifest items for detailed URL listing */
   manifestItems: ManifestItem[];
+  /** Optional manifest entries with canonical URLs per item */
+  manifestEntries?: ReadonlyArray<{
+    item: ManifestItem;
+    canonicalUrl: string;
+    sectionName: string;
+  }>;
 }
 
 /**
@@ -42,7 +48,7 @@ export interface CreateLlmsFullTxtResult {
  * @returns Generated content with metadata
  */
 export function createLlmsFullTxt(options: CreateLlmsFullTxtOptions): CreateLlmsFullTxtResult {
-  const { config, canonicalUrls, manifestItems } = options;
+  const { config, canonicalUrls, manifestItems, manifestEntries } = options;
   const lineEndings = config.format?.lineEndings ?? 'lf';
   const lines: string[] = [];
 
@@ -66,6 +72,11 @@ export function createLlmsFullTxt(options: CreateLlmsFullTxtOptions): CreateLlms
     lines.push(`Organization: ${config.brand.org}`);
   }
   lines.push(`Locales: ${config.brand.locales.join(', ')}`);
+
+  const lastUpdated = getLastUpdatedDate(manifestItems);
+  if (lastUpdated) {
+    lines.push(`Last Updated: ${lastUpdated}`);
+  }
   lines.push('');
 
   // All Canonical URLs
@@ -117,15 +128,24 @@ export function createLlmsFullTxt(options: CreateLlmsFullTxtOptions): CreateLlms
     }
   }
 
-  // Social & Booking
-  const hasSocial = config.contact?.social?.twitter || 
-    config.contact?.social?.linkedin || 
-    config.contact?.social?.github;
-  const hasBooking = config.booking?.url;
-  
-  if (hasSocial || hasBooking) {
-    lines.push('## Social & Booking');
+  // Contact
+  const hasContact = config.contact?.email ||
+    config.contact?.phone ||
+    config.contact?.social?.twitter ||
+    config.contact?.social?.linkedin ||
+    config.contact?.social?.github ||
+    config.booking?.url;
+  if (hasContact) {
+    lines.push('## Contact');
     lines.push('');
+
+    if (config.contact?.email) {
+      lines.push(`- Email: ${config.contact.email}`);
+    }
+
+    if (config.contact?.phone) {
+      lines.push(`- Phone: ${config.contact.phone}`);
+    }
 
     if (config.contact?.social?.twitter) {
       lines.push(`- Twitter: ${config.contact.social.twitter}`);
@@ -191,7 +211,16 @@ export function createLlmsFullTxt(options: CreateLlmsFullTxtOptions): CreateLlms
     }
 
     // Add all manifest URLs
-    if (manifestItems.length > 0) {
+    if (manifestEntries && manifestEntries.length > 0) {
+      const sortedEntries = sortBy(manifestEntries, (entry) => {
+        return `${entry.item.slug}|${entry.canonicalUrl}`;
+      });
+      for (const entry of sortedEntries) {
+        const title = entry.item.title ?? entry.item.slug;
+        const locales = entry.item.locales?.join(', ') ?? config.brand.locales[0] ?? 'en';
+        lines.push(`- [${title}](${entry.canonicalUrl}) (${locales})`);
+      }
+    } else if (manifestItems.length > 0) {
       const sortedItems = sortBy(manifestItems, (item) => item.slug);
       for (const item of sortedItems) {
         const url = item.canonicalOverride ?? `${config.site.baseUrl}${item.slug}`;
@@ -221,6 +250,32 @@ export function createLlmsFullTxt(options: CreateLlmsFullTxtOptions): CreateLlms
     byteSize: Buffer.byteLength(content, 'utf-8'),
     lineCount: finalLines.length,
   };
+}
+
+function getLastUpdatedDate(items: ManifestItem[]): string | null {
+  const timestamps: string[] = [];
+  for (const item of items) {
+    if (item.updatedAt) {
+      timestamps.push(item.updatedAt);
+    } else if (item.publishedAt) {
+      timestamps.push(item.publishedAt);
+    }
+  }
+
+  if (timestamps.length === 0) {
+    return null;
+  }
+
+  const latest = timestamps
+    .map((value) => new Date(value))
+    .filter((value) => !Number.isNaN(value.getTime()))
+    .sort((a, b) => b.getTime() - a.getTime())[0];
+
+  if (!latest) {
+    return null;
+  }
+
+  return latest.toISOString().slice(0, 10);
 }
 
 /**

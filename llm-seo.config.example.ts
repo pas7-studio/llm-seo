@@ -70,36 +70,54 @@ export default {
    * }
    */
   manifests: {
-    blog: [
-      {
-        slug: '/blog/getting-started-with-llm-seo',
-        locales: ['en'],
-        publishedAt: '2024-01-15',
-        updatedAt: '2024-02-01',  // optional
-        priority: 80,             // optional, 0-100
-        title: 'Getting Started with LLM SEO',  // optional
-        description: 'Learn how to optimize for LLMs',  // optional
-      },
-      {
-        slug: '/blog/ai-search-optimization',
-        locales: ['en', 'uk'],
-        publishedAt: '2024-02-10',
-        priority: 90,
-      },
-    ],
-    services: [
-      {
-        slug: '/services/web-development',
-        locales: ['en', 'uk', 'de'],
-        priority: 100,
-      },
-      {
-        slug: '/services/ai-consulting',
-        locales: ['en'],
-        priority: 95,
-      },
-    ],
-    // Add more sections as needed...
+    blog: {
+      sectionName: 'Blog',
+      sectionPath: '/blog',
+      routeStyle: 'locale-segment',
+      items: [
+        {
+          slug: '/getting-started-with-llm-seo',
+          locales: ['en'],
+          publishedAt: '2024-01-15',
+          updatedAt: '2024-02-01',  // optional
+          priority: 80,             // optional, 0-100
+          title: 'Getting Started with LLM SEO',  // optional
+          description: 'Learn how to optimize for LLMs',  // optional
+        },
+        {
+          slug: '/ai-search-optimization',
+          locales: ['en', 'uk'],
+          publishedAt: '2024-02-10',
+          priority: 90,
+        },
+      ],
+    },
+    services: {
+      sectionPath: '/services',
+      routeStyle: 'prefix',
+      items: [
+        {
+          slug: '/web-development',
+          locales: ['en', 'uk', 'de'],
+          priority: 100,
+        },
+        {
+          slug: '/ai-consulting',
+          locales: ['en'],
+          priority: 95,
+        },
+      ],
+    },
+    contactPages: {
+      routeStyle: 'suffix',
+      items: [
+        {
+          slug: '/contact',
+          locales: ['en', 'uk'],
+          priority: 100,
+        },
+      ],
+    },
   },
 
   // ===========================================

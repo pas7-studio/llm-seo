@@ -74,6 +74,12 @@ export interface CreateCitationsJsonOptions {
   manifestItems: ManifestItem[];
   /** Section name for these items */
   sectionName: string;
+  /** Optional canonical entries from routing-aware builder */
+  entries?: ReadonlyArray<{
+    item: ManifestItem;
+    canonicalUrl: string;
+    sectionName: string;
+  }>;
   /** Optional fixed timestamp for deterministic output (tests) */
   fixedTimestamp?: string;
 }
@@ -86,17 +92,23 @@ export interface CreateCitationsJsonOptions {
  * @returns Citations JSON object
  */
 export function createCitationsJson(options: CreateCitationsJsonOptions): CitationsJson {
-  const { config, manifestItems, sectionName, fixedTimestamp } = options;
+  const { config, manifestItems, sectionName, fixedTimestamp, entries } = options;
 
   // Build sources from manifest items
-  const sources: CitationSource[] = manifestItems.map((item) => {
-    const url = item.canonicalOverride ?? `${config.site.baseUrl}${item.slug}`;
+  const sourceInput = entries ?? manifestItems.map((item) => ({
+    item,
+    canonicalUrl: item.canonicalOverride ?? `${config.site.baseUrl}${item.slug}`,
+    sectionName,
+  }));
+  const sources: CitationSource[] = sourceInput.map((entry) => {
+    const url = entry.canonicalUrl;
+    const item = entry.item;
     const defaultLocale = config.site.defaultLocale ?? config.brand.locales[0] ?? 'en';
     
     return {
       url,
       priority: item.priority ?? 50,
-      section: sectionName,
+      section: entry.sectionName,
       locale: item.locales?.[0] ?? defaultLocale,
       ...(item.publishedAt && { publishedAt: item.publishedAt }),
       ...(item.updatedAt && { updatedAt: item.updatedAt }),

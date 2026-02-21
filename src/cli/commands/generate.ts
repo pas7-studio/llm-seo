@@ -3,8 +3,6 @@
  * Main implementation of `llm-seo generate` CLI command.
  */
 
-import type { LlmsSeoConfig } from '../../schema/config.schema.js';
-import type { ManifestItem } from '../../schema/manifest.schema.js';
 import { loadConfig, type LoadConfigResult } from '../io/load-config.js';
 import { writeFileAtomic } from '../io/fs.js';
 import {
@@ -22,7 +20,7 @@ import {
   createLlmsTxt,
   createLlmsFullTxt,
   createCitationsJsonString,
-  createCanonicalUrlsFromManifest,
+  createCanonicalBundleFromConfig,
 } from '../../core/index.js';
 
 /**
@@ -90,23 +88,13 @@ export async function generateCommand(options: GenerateOptions): Promise<number>
       printVerbose(`Brand: ${config.brand.name}`);
     }
     
-    // Step 2: Extract manifest items
-    const manifestItems = extractManifestItems(config);
+    // Step 2: Resolve manifests and canonical URLs
+    const canonicalBundle = createCanonicalBundleFromConfig(config);
+    const manifestItems = canonicalBundle.manifestItems;
+    const canonicalUrls = canonicalBundle.canonicalUrls;
     
     if (verbose) {
       printVerbose(`Found ${manifestItems.length} manifest items`);
-    }
-    
-    // Step 3: Build canonical URLs
-    const canonicalUrls = createCanonicalUrlsFromManifest({
-      items: manifestItems,
-      baseUrl: config.site.baseUrl,
-      defaultLocale: config.site.defaultLocale ?? config.brand.locales[0] ?? 'en',
-      trailingSlash: config.format?.trailingSlash ?? 'never',
-      localeStrategy: 'prefix',
-    });
-    
-    if (verbose) {
       printVerbose(`Generated ${canonicalUrls.length} canonical URLs`);
     }
     
@@ -117,7 +105,8 @@ export async function generateCommand(options: GenerateOptions): Promise<number>
     const llmsFullTxtResult = createLlmsFullTxt({ 
       config, 
       canonicalUrls, 
-      manifestItems 
+      manifestItems,
+      manifestEntries: canonicalBundle.entries,
     });
     
     // Step 6: Optionally generate citations.json
@@ -127,6 +116,7 @@ export async function generateCommand(options: GenerateOptions): Promise<number>
         config,
         manifestItems,
         sectionName: 'all',
+        entries: canonicalBundle.entries,
       });
     }
     
@@ -205,88 +195,6 @@ export async function generateCommand(options: GenerateOptions): Promise<number>
     printError(`Generation failed: ${message}`);
     return ExitCodes.GENERATION_FAILED;
   }
-}
-
-/**
- * Extracts manifest items from config.
- * @param config - LLM SEO config
- * @returns Array of manifest items
- */
-function extractManifestItems(config: LlmsSeoConfig): ManifestItem[] {
-  const items: ManifestItem[] = [];
-  const manifests = config.manifests;
-  
-  // Process each manifest in the manifests record
-  for (const [_manifestName, manifestData] of Object.entries(manifests)) {
-    if (typeof manifestData === 'object' && manifestData !== null) {
-      const data = manifestData as Record<string, unknown>;
-      
-      // Check if it has pages array
-      if (Array.isArray(data.pages)) {
-        for (const page of data.pages) {
-          const normalized = toManifestItem(page);
-          if (normalized) {
-            items.push(normalized);
-          }
-        }
-      }
-      
-      // Check if it's an array directly
-      if (Array.isArray(data)) {
-        for (const item of data) {
-          const normalized = toManifestItem(item);
-          if (normalized) {
-            items.push(normalized);
-          }
-        }
-      }
-    }
-  }
-  
-  return items;
-}
-
-function toManifestItem(value: unknown): ManifestItem | null {
-  if (typeof value !== 'object' || value === null) {
-    return null;
-  }
-
-  const data = value as Record<string, unknown>;
-  const rawSlug = data.slug ?? data.path;
-  if (typeof rawSlug !== 'string' || rawSlug.length === 0) {
-    return null;
-  }
-
-  const item: ManifestItem = {
-    slug: rawSlug.startsWith('/') ? rawSlug : `/${rawSlug}`,
-  };
-
-  if (typeof data.title === 'string') {
-    item.title = data.title;
-  }
-  if (typeof data.description === 'string') {
-    item.description = data.description;
-  }
-  if (Array.isArray(data.locales)) {
-    const locales = data.locales.filter((loc): loc is string => typeof loc === 'string');
-    if (locales.length > 0) {
-      item.locales = locales;
-    }
-  }
-  if (typeof data.canonicalOverride === 'string') {
-    item.canonicalOverride = data.canonicalOverride;
-  }
-  if (typeof data.publishedAt === 'string') {
-    item.publishedAt = data.publishedAt;
-  }
-  if (typeof data.updatedAt === 'string') {
-    item.updatedAt = data.updatedAt;
-  }
-  if (typeof data.priority === 'number') {
-    item.priority = data.priority;
-  }
-
-  return item;
 }
 
 // Legacy export for backwards compatibility

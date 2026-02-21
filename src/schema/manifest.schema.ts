@@ -4,6 +4,9 @@
 
 import { z } from 'zod';
 
+const ISO_DATE_OR_DATETIME =
+  /^\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}(?::\d{2}(?:\.\d{1,3})?)?(?:Z|[+-]\d{2}:\d{2})?)?$/;
+
 /**
  * Schema for ManifestItem - a single page entry in a manifest.
  */
@@ -13,9 +16,15 @@ export const ManifestItemSchema = z.object({
   /** Available locales for this page */
   locales: z.array(z.string().min(2)).optional(),
   /** Publication date (ISO 8601) */
-  publishedAt: z.string().datetime({ message: 'publishedAt must be a valid ISO 8601 date' }).optional(),
+  publishedAt: z.string().regex(
+    ISO_DATE_OR_DATETIME,
+    { message: 'publishedAt must be ISO date (YYYY-MM-DD) or ISO datetime' }
+  ).optional(),
   /** Last update date (ISO 8601) */
-  updatedAt: z.string().datetime({ message: 'updatedAt must be a valid ISO 8601 date' }).optional(),
+  updatedAt: z.string().regex(
+    ISO_DATE_OR_DATETIME,
+    { message: 'updatedAt must be ISO date (YYYY-MM-DD) or ISO datetime' }
+  ).optional(),
   /** Override canonical URL */
   canonicalOverride: z.string().url().optional(),
   /** Priority for citations (0-100) */

@@ -552,6 +552,48 @@ describe('createCanonicalUrlForItem', () => {
     });
     expect(result).toBe('https://example.com/my-post/');
   });
+
+  it('should apply routeStyle="locale-segment" with sectionPath', () => {
+    const item: ManifestItem = { slug: 'my-post', locales: ['en', 'uk'] };
+    const result = createCanonicalUrlForItem(item, {
+      ...baseOptions,
+      routeStyle: 'locale-segment',
+      sectionPath: '/blog',
+    });
+    expect(result).toBe('https://example.com/blog/en/my-post');
+  });
+
+  it('should apply routeStyle="suffix" with non-default locale', () => {
+    const item: ManifestItem = { slug: '/contact', locales: ['uk'] };
+    const result = createCanonicalUrlForItem(item, {
+      ...baseOptions,
+      routeStyle: 'suffix',
+      sectionPath: '',
+    });
+    expect(result).toBe('https://example.com/contact/uk');
+  });
+
+  it('should use pathnameFor for routeStyle="custom"', () => {
+    const item: ManifestItem = { slug: '/faq', locales: ['uk'] };
+    const result = createCanonicalUrlForItem(item, {
+      ...baseOptions,
+      routeStyle: 'custom',
+      sectionName: 'support',
+      sectionPath: '/help',
+      pathnameFor: ({ locale, slug }) => `/custom/${locale}${slug}`,
+    });
+    expect(result).toBe('https://example.com/custom/uk/faq');
+  });
+
+  it('should avoid duplicating sectionPath when slug already includes it', () => {
+    const item: ManifestItem = { slug: '/blog/my-post', locales: ['en'] };
+    const result = createCanonicalUrlForItem(item, {
+      ...baseOptions,
+      routeStyle: 'locale-segment',
+      sectionPath: '/blog',
+    });
+    expect(result).toBe('https://example.com/blog/en/my-post');
+  });
 });
 
 describe('createCanonicalUrlsFromManifest', () => {
@@ -630,5 +672,28 @@ describe('createCanonicalUrlsFromManifest', () => {
     // post-2: de is first sorted locale -> /de prefix
     expect(result).toContain('https://example.com/post-1');
     expect(result).toContain('https://example.com/de/post-2');
+  });
+
+  it('should support mixed routing by section options', () => {
+    const blogItems: ManifestItem[] = [
+      { slug: 'llm-seo', locales: ['en'] },
+      { slug: 'geo-seo', locales: ['uk'] },
+    ];
+    const blogUrls = createCanonicalUrlsFromManifest({
+      ...baseOptions,
+      items: blogItems,
+      routeStyle: 'locale-segment',
+      sectionPath: '/blog',
+    });
+
+    const contactUrls = createCanonicalUrlsFromManifest({
+      ...baseOptions,
+      items: [{ slug: '/contact', locales: ['en', 'uk'] }],
+      routeStyle: 'suffix',
+    });
+
+    expect(blogUrls).toContain('https://example.com/blog/en/llm-seo');
+    expect(blogUrls).toContain('https://example.com/blog/uk/geo-seo');
+    expect(contactUrls).toContain('https://example.com/contact');
   });
 });

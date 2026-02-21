@@ -16,10 +16,20 @@ export {
   createCanonicalUrlForItem,
   dedupeUrls,
   type CreateCanonicalUrlsOptions,
+  type RouteStyle,
+  type CanonicalPathnameArgs,
+  type CanonicalPathnameFor,
   type LocaleStrategy,
   type TrailingSlashPolicy,
   type CanonicalOptions,
 } from './canonical/canonical-from-manifest.js';
+export {
+  resolveManifestSections,
+  createCanonicalBundleFromConfig,
+  type ResolvedManifestSection,
+  type CanonicalManifestEntry,
+  type CanonicalManifestBundle,
+} from './canonical/config-manifests.js';
 export {
   localizePath,
   extractLocaleFromPath,

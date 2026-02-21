@@ -3,7 +3,6 @@
  * Main implementation of `llm-seo check` CLI command.
  */
 
-import type { LlmsSeoConfig } from '../../schema/config.schema.js';
 import { loadConfig, type LoadConfigResult } from '../io/load-config.js';
 import {
   printError,
@@ -21,9 +20,8 @@ import { countSeverities } from '../../core/check/issues.js';
 import {
   createLlmsTxt,
   createLlmsFullTxt,
-  createCanonicalUrlsFromManifest,
+  createCanonicalBundleFromConfig,
 } from '../../core/index.js';
-import type { ManifestItem } from '../../schema/manifest.schema.js';
 
 /**
  * Options for the check command.
@@ -92,19 +90,15 @@ export async function checkCommand(options: CheckCommandOptions): Promise<number
     
     const result = await checkGeneratedFiles(checkOptions);
 
-    const manifestItems = extractManifestItems(config);
-    const canonicalUrls = createCanonicalUrlsFromManifest({
-      items: manifestItems,
-      baseUrl: config.site.baseUrl,
-      defaultLocale: config.site.defaultLocale ?? config.brand.locales[0] ?? 'en',
-      trailingSlash: config.format?.trailingSlash ?? 'never',
-      localeStrategy: 'prefix',
-    });
+    const canonicalBundle = createCanonicalBundleFromConfig(config);
+    const manifestItems = canonicalBundle.manifestItems;
+    const canonicalUrls = canonicalBundle.canonicalUrls;
     const expectedLlms = createLlmsTxt({ config, canonicalUrls });
     const expectedLlmsFull = createLlmsFullTxt({
       config,
       canonicalUrls,
       manifestItems,
+      manifestEntries: canonicalBundle.entries,
     });
 
     const requiredMissing = result.issues.some((issue) => {
@@ -161,82 +155,4 @@ export async function checkCommand(options: CheckCommandOptions): Promise<number
     printError(`Check failed: ${message}`);
     return ExitCodes.ERROR;
   }
-}
-
-/**
- * Extracts manifest items from config.
- */
-function extractManifestItems(config: LlmsSeoConfig): ManifestItem[] {
-  const items: ManifestItem[] = [];
-  
-  const manifests = config.manifests;
-  
-  for (const [_manifestName, manifestData] of Object.entries(manifests)) {
-    if (typeof manifestData === 'object' && manifestData !== null) {
-      const data = manifestData as Record<string, unknown>;
-      
-      if (Array.isArray(data.pages)) {
-        for (const page of data.pages) {
-          const normalized = toManifestItem(page);
-          if (normalized) {
-            items.push(normalized);
-          }
-        }
-      }
-      
-      if (Array.isArray(data)) {
-        for (const item of data) {
-          const normalized = toManifestItem(item);
-          if (normalized) {
-            items.push(normalized);
-          }
-        }
-      }
-    }
-  }
-  
-  return items;
-}
-
-function toManifestItem(value: unknown): ManifestItem | null {
-  if (typeof value !== 'object' || value === null) {
-    return null;
-  }
-
-  const data = value as Record<string, unknown>;
-  const rawSlug = data.slug ?? data.path;
-  if (typeof rawSlug !== 'string' || rawSlug.length === 0) {
-    return null;
-  }
-
-  const item: ManifestItem = {
-    slug: rawSlug.startsWith('/') ? rawSlug : `/${rawSlug}`,
-  };
-
-  if (typeof data.title === 'string') {
-    item.title = data.title;
-  }
-  if (typeof data.description === 'string') {
-    item.description = data.description;
-  }
-  if (Array.isArray(data.locales)) {
-    const locales = data.locales.filter((loc): loc is string => typeof loc === 'string');
-    if (locales.length > 0) {
-      item.locales = locales;
-    }
-  }
-  if (typeof data.canonicalOverride === 'string') {
-    item.canonicalOverride = data.canonicalOverride;
-  }
-  if (typeof data.publishedAt === 'string') {
-    item.publishedAt = data.publishedAt;
-  }
-  if (typeof data.updatedAt === 'string') {
-    item.updatedAt = data.updatedAt;
-  }
-  if (typeof data.priority === 'number') {
-    item.priority = data.priority;
-  }
-
-  return item;
 }

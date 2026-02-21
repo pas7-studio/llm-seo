@@ -182,7 +182,7 @@ describe('createLlmsFullTxt', () => {
       expect(result.content).toContain('> Building the future, today');
       expect(result.content).toContain('## All Canonical URLs');
       expect(result.content).toContain('## Policies');
-      expect(result.content).toContain('## Social & Booking');
+      expect(result.content).toContain('## Contact');
       expect(result.content).toContain('## Machine Hints');
       expect(result.content).toContain('## Sitemap');
     });
@@ -218,6 +218,17 @@ describe('createLlmsFullTxt', () => {
       });
 
       expect(result.content).toContain('Locales: en, uk, de');
+    });
+
+    it('should include Last Updated from manifest items', () => {
+      const config = createFullConfig();
+      const result = createLlmsFullTxt({
+        config,
+        canonicalUrls: [],
+        manifestItems: createManifestItems(),
+      });
+
+      expect(result.content).toContain('Last Updated: 2024-01-15');
     });
 
     it('should include detailed GEO policy section', () => {
@@ -271,6 +282,18 @@ describe('createLlmsFullTxt', () => {
       expect(result.content).toContain('GitHub: https://github.com/acmecorp');
     });
 
+    it('should include contact email and phone', () => {
+      const config = createFullConfig();
+      const result = createLlmsFullTxt({
+        config,
+        canonicalUrls: [],
+        manifestItems: [],
+      });
+
+      expect(result.content).toContain('Email: contact@acme.com');
+      expect(result.content).toContain('Phone: +1-555-123-4567');
+    });
+
     it('should include booking with label', () => {
       const config = createFullConfig();
       const result = createLlmsFullTxt({
@@ -309,6 +332,26 @@ describe('createLlmsFullTxt', () => {
       expect(result.content).toContain('/services/web-development');
       expect(result.content).toContain('First Blog Post');
       expect(result.content).toContain('/blog/post-1');
+    });
+
+    it('should use routing-aware canonical URLs in sitemap entries when provided', () => {
+      const config = createFullConfig();
+      const manifestItems = createManifestItems();
+      const result = createLlmsFullTxt({
+        config,
+        canonicalUrls: [],
+        manifestItems,
+        manifestEntries: [
+          {
+            item: manifestItems[0]!,
+            canonicalUrl: 'https://example.com/services/en/web-development',
+            sectionName: 'services',
+          },
+        ],
+      });
+
+      expect(result.content).toContain('https://example.com/services/en/web-development');
+      expect(result.content).not.toContain('https://example.com/services/web-development');
     });
 
     it('should include section hubs in sitemap', () => {
